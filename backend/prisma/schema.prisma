@@ -147,6 +147,10 @@ model Trip {
   maxSpeed         Float      @default(0)
   averageSpeed     Float      @default(0)
   status           TripStatus @default(ACTIVE)
+  /// Timestamp of the last point recorded at/above TRIP_START_SPEED_KMH.
+  /// Drives the temporary-stop-vs-trip-end distinction (see TripDetectionService)
+  /// and is not itself exposed through the API.
+  lastMovingAt     DateTime
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
 

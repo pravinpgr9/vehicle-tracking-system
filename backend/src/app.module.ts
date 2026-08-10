@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { EventEmitterModule } from '@nestjs/event-emitter';
+import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import configuration from './config/configuration';
 import { validationSchema } from './config/validation';
@@ -12,6 +13,7 @@ import { UsersModule } from './users/users.module';
 import { VehiclesModule } from './vehicles/vehicles.module';
 import { DevicesModule } from './devices/devices.module';
 import { TrackingModule } from './tracking/tracking.module';
+import { TripsModule } from './trips/trips.module';
 
 @Module({
   imports: [
@@ -33,6 +35,7 @@ import { TrackingModule } from './tracking/tracking.module';
       }),
     }),
     EventEmitterModule.forRoot(),
+    ScheduleModule.forRoot(),
     PrismaModule,
     HealthModule,
     AuthModule,
@@ -40,6 +43,7 @@ import { TrackingModule } from './tracking/tracking.module';
     VehiclesModule,
     DevicesModule,
     TrackingModule,
+    TripsModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

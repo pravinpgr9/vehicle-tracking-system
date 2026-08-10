@@ -15,6 +15,7 @@ import { VehiclesService } from '../vehicles/vehicles.service';
 import { AppEvent } from '../common/constants/events';
 import { LocationIngestedEvent } from '../common/events/location-ingested.event';
 import { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
+import type { Trip } from '../generated/prisma/client';
 import type { AuthenticatedUser } from '../auth/decorators/current-user.decorator';
 
 interface AuthenticatedSocket extends Socket {
@@ -100,6 +101,21 @@ export class TrackingGateway
       heading: location.heading,
       recordedAt: location.recordedAt,
     });
+  }
+
+  @OnEvent(AppEvent.TRIP_STARTED)
+  handleTripStarted(trip: Trip): void {
+    this.server.to(vehicleRoom(trip.vehicleId)).emit('trip:started', trip);
+  }
+
+  @OnEvent(AppEvent.TRIP_UPDATED)
+  handleTripUpdated(trip: Trip): void {
+    this.server.to(vehicleRoom(trip.vehicleId)).emit('trip:updated', trip);
+  }
+
+  @OnEvent(AppEvent.TRIP_COMPLETED)
+  handleTripCompleted(trip: Trip): void {
+    this.server.to(vehicleRoom(trip.vehicleId)).emit('trip:completed', trip);
   }
 
   private requireUserId(client: AuthenticatedSocket): string {
