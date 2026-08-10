@@ -16,6 +16,8 @@ import { TrackingModule } from './tracking/tracking.module';
 import { TripsModule } from './trips/trips.module';
 import { GeofencesModule } from './geofences/geofences.module';
 import { AlertsModule } from './alerts/alerts.module';
+import { ReportsModule } from './reports/reports.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -48,6 +50,8 @@ import { AlertsModule } from './alerts/alerts.module';
     TripsModule,
     GeofencesModule,
     AlertsModule,
+    ReportsModule,
+    DashboardModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

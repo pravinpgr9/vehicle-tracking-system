@@ -70,10 +70,7 @@ export class TrackingService {
   }
 
   async getCurrentLocation(vehicleId: string): Promise<Location> {
-    const location = await this.prisma.location.findFirst({
-      where: { vehicleId },
-      orderBy: { recordedAt: 'desc' },
-    });
+    const location = await this.findCurrentLocation(vehicleId);
     if (!location) {
       throw new AppException(
         ErrorCode.NOT_FOUND,
@@ -82,6 +79,14 @@ export class TrackingService {
       );
     }
     return location;
+  }
+
+  /** Nullable variant for callers (e.g. the dashboard) that tolerate "no data yet". */
+  async findCurrentLocation(vehicleId: string): Promise<Location | null> {
+    return this.prisma.location.findFirst({
+      where: { vehicleId },
+      orderBy: { recordedAt: 'desc' },
+    });
   }
 
   async getHistory(
