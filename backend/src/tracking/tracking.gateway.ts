@@ -14,8 +14,9 @@ import { Server, Socket } from 'socket.io';
 import { VehiclesService } from '../vehicles/vehicles.service';
 import { AppEvent } from '../common/constants/events';
 import { LocationIngestedEvent } from '../common/events/location-ingested.event';
+import { GeofenceTransitionEvent } from '../common/events/geofence-transition.event';
 import { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
-import type { Trip } from '../generated/prisma/client';
+import type { Alert, Trip } from '../generated/prisma/client';
 import type { AuthenticatedUser } from '../auth/decorators/current-user.decorator';
 
 interface AuthenticatedSocket extends Socket {
@@ -116,6 +117,35 @@ export class TrackingGateway
   @OnEvent(AppEvent.TRIP_COMPLETED)
   handleTripCompleted(trip: Trip): void {
     this.server.to(vehicleRoom(trip.vehicleId)).emit('trip:completed', trip);
+  }
+
+  @OnEvent(AppEvent.GEOFENCE_ENTERED)
+  handleGeofenceEntered(payload: GeofenceTransitionEvent): void {
+    this.server
+      .to(vehicleRoom(payload.event.vehicleId))
+      .emit('geofence:entered', {
+        vehicleId: payload.event.vehicleId,
+        geofenceId: payload.geofence.id,
+        geofenceName: payload.geofence.name,
+        occurredAt: payload.event.occurredAt,
+      });
+  }
+
+  @OnEvent(AppEvent.GEOFENCE_EXITED)
+  handleGeofenceExited(payload: GeofenceTransitionEvent): void {
+    this.server
+      .to(vehicleRoom(payload.event.vehicleId))
+      .emit('geofence:exited', {
+        vehicleId: payload.event.vehicleId,
+        geofenceId: payload.geofence.id,
+        geofenceName: payload.geofence.name,
+        occurredAt: payload.event.occurredAt,
+      });
+  }
+
+  @OnEvent(AppEvent.ALERT_CREATED)
+  handleAlertCreated(alert: Alert): void {
+    this.server.to(vehicleRoom(alert.vehicleId)).emit('alert:created', alert);
   }
 
   private requireUserId(client: AuthenticatedSocket): string {

@@ -14,6 +14,8 @@ import { VehiclesModule } from './vehicles/vehicles.module';
 import { DevicesModule } from './devices/devices.module';
 import { TrackingModule } from './tracking/tracking.module';
 import { TripsModule } from './trips/trips.module';
+import { GeofencesModule } from './geofences/geofences.module';
+import { AlertsModule } from './alerts/alerts.module';
 
 @Module({
   imports: [
@@ -44,6 +46,8 @@ import { TripsModule } from './trips/trips.module';
     DevicesModule,
     TrackingModule,
     TripsModule,
+    GeofencesModule,
+    AlertsModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
