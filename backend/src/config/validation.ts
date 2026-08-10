@@ -9,7 +9,9 @@ export const validationSchema = Joi.object({
   DATABASE_URL: Joi.string().uri().required(),
 
   JWT_SECRET: Joi.string().min(16).required(),
-  JWT_EXPIRES_IN: Joi.string().default('7d'),
+  JWT_EXPIRES_IN: Joi.string()
+    .pattern(/^\d+[smhd]$/)
+    .default('7d'),
 
   CORS_ORIGIN: Joi.string().default('*'),
 

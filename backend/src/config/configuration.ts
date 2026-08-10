@@ -1,3 +1,5 @@
+import { parseDurationToSeconds } from '../common/utils/duration.util';
+
 export interface AppConfig {
   env: string;
   port: number;
@@ -10,7 +12,7 @@ export interface DatabaseConfig {
 
 export interface JwtConfig {
   secret: string;
-  expiresIn: string;
+  expiresInSeconds: number;
 }
 
 export interface TripConfig {
@@ -55,7 +57,9 @@ export default (): Configuration => ({
   },
   jwt: {
     secret: process.env.JWT_SECRET ?? '',
-    expiresIn: process.env.JWT_EXPIRES_IN ?? '7d',
+    expiresInSeconds: parseDurationToSeconds(
+      process.env.JWT_EXPIRES_IN ?? '7d',
+    ),
   },
   trip: {
     startSpeedKmh: Number(process.env.TRIP_START_SPEED_KMH ?? 5),
