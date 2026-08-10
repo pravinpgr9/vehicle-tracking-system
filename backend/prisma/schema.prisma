@@ -1,0 +1,210 @@
+// Prisma schema for the Vehicle Tracking & Telematics Platform.
+// See ARCHITECTURE.md for the reasoning behind the Vehicle/Device split.
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum VehicleStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum DeviceType {
+  PHONE
+  GPS_TRACKER
+  OBD2
+  ESP32
+  IOT_DEVICE
+}
+
+enum TripStatus {
+  ACTIVE
+  COMPLETED
+}
+
+enum GeofenceEventType {
+  ENTER
+  EXIT
+}
+
+enum AlertType {
+  OVERSPEED
+  GEOFENCE_ENTER
+  GEOFENCE_EXIT
+  DEVICE_OFFLINE
+  LONG_STOP
+}
+
+enum AlertSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+model User {
+  id           String   @id @default(uuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         Role     @default(USER)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  vehicles   Vehicle[]
+  geofences  Geofence[]
+
+  @@map("users")
+}
+
+model Vehicle {
+  id                 String        @id @default(uuid())
+  userId             String
+  name               String
+  registrationNumber String
+  make               String?
+  model              String?
+  year               Int?
+  status             VehicleStatus @default(ACTIVE)
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  devices         Device[]
+  locations       Location[]
+  trips           Trip[]
+  geofenceEvents  GeofenceEvent[]
+  alerts          Alert[]
+
+  @@index([userId])
+  @@map("vehicles")
+}
+
+model Device {
+  id               String     @id @default(uuid())
+  vehicleId        String
+  deviceType       DeviceType
+  deviceIdentifier String     @unique
+  platform         String?
+  deviceTokenHash  String
+  isActive         Boolean    @default(true)
+  lastSeenAt       DateTime?
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  vehicle   Vehicle    @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  locations Location[]
+
+  @@index([vehicleId])
+  @@map("devices")
+}
+
+model Location {
+  id            String   @id @default(uuid())
+  vehicleId     String
+  deviceId      String
+  latitude      Float
+  longitude     Float
+  altitude      Float?
+  speed         Float?
+  heading       Float?
+  accuracy      Float?
+  batteryLevel  Int?
+  recordedAt    DateTime
+  receivedAt    DateTime @default(now())
+
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  device  Device  @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@index([vehicleId])
+  @@index([recordedAt])
+  @@index([vehicleId, recordedAt])
+  @@map("locations")
+}
+
+model Trip {
+  id               String     @id @default(uuid())
+  vehicleId        String
+  startedAt        DateTime
+  endedAt          DateTime?
+  startLatitude    Float
+  startLongitude   Float
+  endLatitude      Float?
+  endLongitude     Float?
+  distanceMeters   Float      @default(0)
+  durationSeconds  Int?
+  maxSpeed         Float      @default(0)
+  averageSpeed     Float      @default(0)
+  status           TripStatus @default(ACTIVE)
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@index([vehicleId])
+  @@index([vehicleId, status])
+  @@map("trips")
+}
+
+model Geofence {
+  id           String   @id @default(uuid())
+  userId       String
+  name         String
+  latitude     Float
+  longitude    Float
+  radiusMeters Float
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user   User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  events GeofenceEvent[]
+
+  @@index([userId])
+  @@map("geofences")
+}
+
+model GeofenceEvent {
+  id         String            @id @default(uuid())
+  vehicleId  String
+  geofenceId String
+  eventType  GeofenceEventType
+  latitude   Float
+  longitude  Float
+  occurredAt DateTime          @default(now())
+
+  vehicle  Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  geofence Geofence @relation(fields: [geofenceId], references: [id], onDelete: Cascade)
+
+  @@index([vehicleId, geofenceId, occurredAt])
+  @@map("geofence_events")
+}
+
+model Alert {
+  id         String        @id @default(uuid())
+  vehicleId  String
+  type       AlertType
+  severity   AlertSeverity @default(WARNING)
+  title      String
+  message    String
+  metadata   Json?
+  occurredAt DateTime      @default(now())
+  readAt     DateTime?
+
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@index([vehicleId])
+  @@index([vehicleId, type])
+  @@map("alerts")
+}
