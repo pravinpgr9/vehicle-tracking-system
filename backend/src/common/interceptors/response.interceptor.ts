@@ -30,6 +30,11 @@ export class ResponseInterceptor<T> implements NestInterceptor<
     if (request.url.startsWith('/api/health')) {
       return next.handle();
     }
-    return next.handle().pipe(map((data) => ({ success: true, data })));
+    return next.handle().pipe(
+      map((data) =>
+        // Leave a 204 No Content (e.g. DELETE) with a genuinely empty body.
+        data === undefined ? data : { success: true, data },
+      ),
+    );
   }
 }

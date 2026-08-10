@@ -6,6 +6,10 @@ import configuration from './config/configuration';
 import { validationSchema } from './config/validation';
 import { PrismaModule } from './prisma/prisma.module';
 import { HealthModule } from './health/health.module';
+import { AuthModule } from './auth/auth.module';
+import { UsersModule } from './users/users.module';
+import { VehiclesModule } from './vehicles/vehicles.module';
+import { DevicesModule } from './devices/devices.module';
 
 @Module({
   imports: [
@@ -28,6 +32,10 @@ import { HealthModule } from './health/health.module';
     }),
     PrismaModule,
     HealthModule,
+    AuthModule,
+    UsersModule,
+    VehiclesModule,
+    DevicesModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

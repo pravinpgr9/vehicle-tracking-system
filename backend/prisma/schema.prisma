@@ -97,7 +97,7 @@ model Device {
   deviceType       DeviceType
   deviceIdentifier String     @unique
   platform         String?
-  deviceTokenHash  String
+  deviceTokenHash  String     @unique
   isActive         Boolean    @default(true)
   lastSeenAt       DateTime?
   createdAt        DateTime   @default(now())

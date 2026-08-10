@@ -2,7 +2,6 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { AuthService } from './auth.service';
 import { UsersService } from '../users/users.service';
-import { AppException } from '../common/exceptions/app.exception';
 import { ErrorCode } from '../common/constants/error-codes';
 import { Role, User } from '../generated/prisma/client';
 
@@ -19,14 +18,30 @@ function buildUser(overrides: Partial<User> = {}): User {
   };
 }
 
+interface CreateUserInput {
+  name: string;
+  email: string;
+  passwordHash: string;
+}
+
 describe('AuthService', () => {
   let authService: AuthService;
-  let usersService: { findByEmail: jest.Mock; create: jest.Mock };
-  let jwtService: { sign: jest.Mock };
+  let usersService: {
+    findByEmail: jest.Mock<Promise<User | null>, [string]>;
+    create: jest.Mock<Promise<User>, [CreateUserInput]>;
+  };
+  let jwtService: { sign: jest.Mock<string, [Record<string, unknown>]> };
 
   beforeEach(() => {
-    usersService = { findByEmail: jest.fn(), create: jest.fn() };
-    jwtService = { sign: jest.fn().mockReturnValue('signed.jwt.token') };
+    usersService = {
+      findByEmail: jest.fn<Promise<User | null>, [string]>(),
+      create: jest.fn<Promise<User>, [CreateUserInput]>(),
+    };
+    jwtService = {
+      sign: jest
+        .fn<string, [Record<string, unknown>]>()
+        .mockReturnValue('signed.jwt.token'),
+    };
     authService = new AuthService(
       usersService as unknown as UsersService,
       jwtService as unknown as JwtService,
@@ -45,14 +60,13 @@ describe('AuthService', () => {
         }),
       ).rejects.toMatchObject({
         code: ErrorCode.EMAIL_ALREADY_REGISTERED,
-      } as Partial<AppException>);
+      });
     });
 
     it('hashes the password before storing the user', async () => {
       usersService.findByEmail.mockResolvedValue(null);
-      usersService.create.mockImplementation(
-        (data: { passwordHash: string }) =>
-          Promise.resolve(buildUser({ passwordHash: data.passwordHash })),
+      usersService.create.mockImplementation((data: { passwordHash: string }) =>
+        Promise.resolve(buildUser({ passwordHash: data.passwordHash })),
       );
 
       await authService.register({
@@ -89,10 +103,13 @@ describe('AuthService', () => {
       usersService.findByEmail.mockResolvedValue(null);
 
       await expect(
-        authService.login({ email: 'nobody@example.com', password: 'whatever1' }),
+        authService.login({
+          email: 'nobody@example.com',
+          password: 'whatever1',
+        }),
       ).rejects.toMatchObject({
         code: ErrorCode.INVALID_CREDENTIALS,
-      } as Partial<AppException>);
+      });
     });
 
     it('rejects an incorrect password', async () => {
@@ -106,7 +123,7 @@ describe('AuthService', () => {
         }),
       ).rejects.toMatchObject({
         code: ErrorCode.INVALID_CREDENTIALS,
-      } as Partial<AppException>);
+      });
     });
 
     it('accepts the correct password and returns a token', async () => {
