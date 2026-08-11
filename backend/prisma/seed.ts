@@ -12,10 +12,9 @@ import * as bcrypt from 'bcrypt';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient, DeviceType } from '../src/generated/prisma/client';
 import {
-  haversineDistanceMeters,
-  kmhToMs,
-  msToKmh,
-} from '../src/common/utils/geo.util';
+  buildLegLocations,
+  summarizeTrip,
+} from '../src/common/utils/route-sim.util';
 import { generateToken, hashToken } from '../src/common/utils/token.util';
 
 const BCRYPT_SALT_ROUNDS = 12;
@@ -25,90 +24,7 @@ const DEVICE_IDENTIFIER = 'android-car-001';
 
 const HOME = { latitude: 20.0056, longitude: 73.7891 };
 const OFFICE = { latitude: 20.1056, longitude: 73.8891 };
-
 const CRUISE_SPEED_KMH = 32;
-const TICK_SECONDS = 120;
-const STOP_TICKS = 2;
-
-interface SeedLocation {
-  latitude: number;
-  longitude: number;
-  speed: number;
-  recordedAt: Date;
-}
-
-function interpolate(
-  from: { latitude: number; longitude: number },
-  to: { latitude: number; longitude: number },
-  t: number,
-) {
-  return {
-    latitude: from.latitude + (to.latitude - from.latitude) * t,
-    longitude: from.longitude + (to.longitude - from.longitude) * t,
-  };
-}
-
-/** Builds one leg's worth of locations: ramp up, cruise with one stop, ramp down. */
-function buildLegLocations(
-  from: { latitude: number; longitude: number },
-  to: { latitude: number; longitude: number },
-  startAt: Date,
-): SeedLocation[] {
-  const totalDistance = haversineDistanceMeters(from, to);
-  const distancePerTick = kmhToMs(CRUISE_SPEED_KMH) * TICK_SECONDS;
-  const steps = Math.max(6, Math.round(totalDistance / distancePerTick));
-  const stopAtStep = Math.floor(steps / 2);
-
-  const locations: SeedLocation[] = [];
-  let tick = 0;
-  for (let step = 0; step <= steps; step++) {
-    const t = step / steps;
-    const isEndpoint = step === 0 || step === steps;
-    locations.push({
-      ...interpolate(from, to, t),
-      speed: isEndpoint ? 0 : CRUISE_SPEED_KMH,
-      recordedAt: new Date(startAt.getTime() + tick * TICK_SECONDS * 1000),
-    });
-    tick++;
-
-    if (step === stopAtStep) {
-      for (let s = 0; s < STOP_TICKS; s++) {
-        locations.push({
-          ...interpolate(from, to, t),
-          speed: 0,
-          recordedAt: new Date(startAt.getTime() + tick * TICK_SECONDS * 1000),
-        });
-        tick++;
-      }
-    }
-  }
-  return locations;
-}
-
-function summarizeTrip(locations: SeedLocation[]) {
-  let distanceMeters = 0;
-  let maxSpeed = 0;
-  for (let i = 1; i < locations.length; i++) {
-    distanceMeters += haversineDistanceMeters(locations[i - 1], locations[i]);
-    maxSpeed = Math.max(maxSpeed, locations[i].speed);
-  }
-  const startedAt = locations[0].recordedAt;
-  const endedAt = locations[locations.length - 1].recordedAt;
-  const durationSeconds = Math.round(
-    (endedAt.getTime() - startedAt.getTime()) / 1000,
-  );
-  const averageSpeed =
-    durationSeconds > 0 ? msToKmh(distanceMeters / durationSeconds) : 0;
-
-  return {
-    startedAt,
-    endedAt,
-    durationSeconds,
-    distanceMeters,
-    maxSpeed,
-    averageSpeed,
-  };
-}
 
 async function main(): Promise<void> {
   const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
@@ -157,8 +73,18 @@ async function main(): Promise<void> {
   const morningStart = new Date(today.getTime() + 8.5 * 60 * 60 * 1000); // 08:30 UTC
   const eveningStart = new Date(today.getTime() + 18 * 60 * 60 * 1000); // 18:00 UTC
 
-  const morningLocations = buildLegLocations(HOME, OFFICE, morningStart);
-  const eveningLocations = buildLegLocations(OFFICE, HOME, eveningStart);
+  const morningLocations = buildLegLocations(
+    HOME,
+    OFFICE,
+    morningStart,
+    CRUISE_SPEED_KMH,
+  );
+  const eveningLocations = buildLegLocations(
+    OFFICE,
+    HOME,
+    eveningStart,
+    CRUISE_SPEED_KMH,
+  );
 
   for (const locations of [morningLocations, eveningLocations]) {
     await prisma.location.createMany({
