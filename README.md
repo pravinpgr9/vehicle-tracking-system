@@ -7,21 +7,20 @@ Android Phone (GPS) --HTTPS--> NestJS Backend --+-- PostgreSQL
                                                   +-- WebSocket Gateway --> Dashboard
 ```
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for the design decisions behind this, [API.md](API.md) for the full endpoint reference with `curl` examples, and [backend/DEVELOPMENT.md](backend/DEVELOPMENT.md) for day-to-day dev commands.
+See [ARCHITECTURE.md](ARCHITECTURE.md) for the design decisions, [API.md](API.md) for the full endpoint reference with `curl` examples, and [backend/DEVELOPMENT.md](backend/DEVELOPMENT.md) for day-to-day dev commands.
 
-## Requirements
+---
+
+## Quick start — run both apps locally
+
+Three terminals: backend, frontend, and (optionally) something to feed it GPS data. Ports used: backend `3000`, frontend `5173` (Vite's default).
+
+### Prerequisites
 
 - Node.js 24+
-- PostgreSQL 14+ (local install, [Postgres.app](https://postgresapp.com/), or the provided `docker-compose.yml`)
+- A running PostgreSQL 14+ — a local install, [Postgres.app](https://postgresapp.com/), or `docker compose up -d postgres` from the repo root (needs Docker installed)
 
-## Project structure
-
-```
-backend/    NestJS API + WebSocket gateway + Prisma schema
-frontend/   React/Vite dashboard
-```
-
-## Installation
+### Terminal 1 — Backend
 
 ```bash
 cd backend
@@ -29,46 +28,82 @@ npm install
 cp .env.example .env
 ```
 
-Edit `.env`: at minimum, set `DATABASE_URL` to a real Postgres connection string and `JWT_SECRET` to a long random value. The rest of the variables have sensible defaults — see the comments in `.env.example` for what each one controls (trip detection thresholds, alert thresholds, GPS jump validation, rate limiting).
+Open `.env` and set at minimum:
 
-## Database setup, migration, seed
-
-```bash
-npx prisma migrate dev   # creates the schema
-npm run seed              # optional: demo user, vehicle, device, geofences, trips, alerts
+```env
+DATABASE_URL=postgresql://<user>:<password>@localhost:5432/<your_db_name>
+JWT_SECRET=<any long random string>
 ```
 
-`npm run seed` prints the demo account's credentials and its device's one-time token to the console — see [backend/DEVELOPMENT.md](backend/DEVELOPMENT.md#seed-data).
-
-## Running the backend
+(Everything else in `.env.example` already has a working default.)
 
 ```bash
+npx prisma migrate dev    # creates all tables
+npm run seed               # demo user + vehicle + device + geofences + trips + alerts
 npm run start:dev
 ```
 
-- API: `http://localhost:3000/api/v1`
-- Swagger UI: `http://localhost:3000/api/docs`
-- Health check: `http://localhost:3000/api/health`
+Leave this running. You should see Nest's startup log end with `Nest application successfully started`, and:
 
-## Running the frontend
+```bash
+curl http://localhost:3000/api/health
+# {"status":"ok","database":"connected","timestamp":"..."}
+```
+
+`npm run seed` prints something like this — **copy the device token, you can't get it again**:
+
+```
+Seed complete:
+  User:     demo@example.com / Str0ngPass!
+  Vehicle:  My C3 (c4865721-...)
+  Device:   android-car-001 (f22180f0-...)
+  Device token (for the GPS simulator, shown only now):
+    4790c9a24ad774dede64868b8c652d98f9f513dd4ef49a1e83b37bfc295d2879
+```
+
+### Terminal 2 — Frontend
 
 ```bash
 cd frontend
 npm install
-cp .env.example .env   # defaults already point at localhost:3000
+cp .env.example .env    # defaults already point at http://localhost:3000
 npm run dev
 ```
 
-Open the printed local URL and log in with the seeded demo account (or register a new one).
+Open the URL it prints (typically `http://localhost:5173`) and log in with the seeded account: `demo@example.com` / `Str0ngPass!`. You should land on the dashboard and see the vehicle, today's stats, and the two seeded trips in "Recent trips" — that confirms the frontend is successfully talking to the backend.
 
-## Running the GPS simulator
+### Terminal 3 (optional) — put a live dot on the map
 
-Sends realistic simulated GPS points to a running backend — see [backend/DEVELOPMENT.md](backend/DEVELOPMENT.md#gps-simulator):
+The seed data is historical (today's trips already "happened"); to see the map marker actually move, feed it live GPS points with the simulator:
 
 ```bash
 cd backend
-export SIMULATOR_VEHICLE_ID=<id> SIMULATOR_DEVICE_ID=<identifier> SIMULATOR_DEVICE_TOKEN=<token>
+export SIMULATOR_VEHICLE_ID=<vehicle id, e.g. from the seed output or GET /api/v1/vehicles>
+export SIMULATOR_DEVICE_ID=android-car-001
+export SIMULATOR_DEVICE_TOKEN=<the device token the seed script printed>
 npm run gps:simulate
+```
+
+With the dashboard open in a browser, you should see the marker move and the speed/status update within a few seconds — no page refresh needed (it's coming over the WebSocket). `Ctrl+C` in this terminal to stop it.
+
+### Troubleshooting
+
+| Symptom | Likely cause |
+|---|---|
+| Backend fails to start with a Prisma/connection error | `DATABASE_URL` is wrong, or Postgres isn't running / isn't reachable on that host:port |
+| Frontend loads but login fails with a network error | Backend isn't running, or `VITE_API_URL` in `frontend/.env` doesn't match where it's actually listening |
+| Login works but the map/dashboard shows nothing | No location data yet for that vehicle — run `npm run seed` and/or the GPS simulator |
+| `EADDRINUSE` on port 3000 or 5173 | Something else is already listening there — `lsof -ti:3000 \| xargs kill` (or change `PORT` / pass `--port` to Vite) |
+| GPS simulator prints "Missing required environment variables" | Set all three `SIMULATOR_*` vars — the device token only ever prints once, at registration/seed time |
+| GPS simulator gets `401`/`403` responses | Device token doesn't match `SIMULATOR_DEVICE_ID`/`SIMULATOR_VEHICLE_ID`, or the device was deactivated |
+
+---
+
+## Project structure
+
+```
+backend/    NestJS API + WebSocket gateway + Prisma schema
+frontend/   React/Vite dashboard
 ```
 
 ## Running tests
