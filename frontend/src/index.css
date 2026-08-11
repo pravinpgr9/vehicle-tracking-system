@@ -1,15 +1,70 @@
 :root {
-  --color-bg: #f4f5f7;
-  --color-surface: #ffffff;
-  --color-border: #e2e4e9;
-  --color-text: #1a1d24;
+  color-scheme: light;
+  --surface-0: #f4f5f7;
+  --surface-1: #ffffff;
+  --surface-2: #f7f8fa;
+  --color-border: #e5e7eb;
+  --color-text: #14161a;
   --color-text-muted: #6b7280;
-  --color-primary: #2563eb;
-  --color-success: #16a34a;
-  --color-warning: #d97706;
-  --color-danger: #dc2626;
-  --radius: 10px;
-  --shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+
+  --color-primary: #2a78d6;
+  --color-primary-soft: #e8f0fc;
+
+  --color-good: #0ca30c;
+  --color-good-soft: #e6f6e6;
+  --color-warning: #b4790a;
+  --color-warning-soft: #fdf1dc;
+  --color-critical: #d03b3b;
+  --color-critical-soft: #fbe9e9;
+
+  --radius: 12px;
+  --shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 1px 3px rgba(16, 24, 40, 0.06);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+    --surface-0: #121214;
+    --surface-1: #1a1a1d;
+    --surface-2: #202024;
+    --color-border: #2d2d31;
+    --color-text: #f4f4f5;
+    --color-text-muted: #9a9aa2;
+
+    --color-primary: #3987e5;
+    --color-primary-soft: #17263b;
+
+    --color-good: #17b317;
+    --color-good-soft: #12281a;
+    --color-warning: #d99a1f;
+    --color-warning-soft: #2e2510;
+    --color-critical: #e66767;
+    --color-critical-soft: #331717;
+
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 3px rgba(0, 0, 0, 0.35);
+  }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --surface-0: #121214;
+  --surface-1: #1a1a1d;
+  --surface-2: #202024;
+  --color-border: #2d2d31;
+  --color-text: #f4f4f5;
+  --color-text-muted: #9a9aa2;
+
+  --color-primary: #3987e5;
+  --color-primary-soft: #17263b;
+
+  --color-good: #17b317;
+  --color-good-soft: #12281a;
+  --color-warning: #d99a1f;
+  --color-warning-soft: #2e2510;
+  --color-critical: #e66767;
+  --color-critical-soft: #331717;
+
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 3px rgba(0, 0, 0, 0.35);
 }
 
 * {
@@ -26,7 +81,7 @@ body,
 body {
   font-family:
     -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background: var(--color-bg);
+  background: var(--surface-0);
   color: var(--color-text);
 }
 
@@ -38,7 +93,7 @@ select {
 }
 
 .card {
-  background: var(--color-surface);
+  background: var(--surface-1);
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
@@ -51,5 +106,5 @@ select {
   border-radius: 50%;
   background: var(--color-primary);
   border: 2px solid white;
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.4);
+  box-shadow: 0 0 0 2px rgba(42, 120, 214, 0.4);
 }

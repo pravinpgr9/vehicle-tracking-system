@@ -80,6 +80,16 @@ export interface PaginatedResponse<T> {
   nextCursor: string | null;
 }
 
+export interface Geofence {
+  id: string;
+  userId: string;
+  name: string;
+  latitude: number;
+  longitude: number;
+  radiusMeters: number;
+  isActive: boolean;
+}
+
 export type AlertType =
   | 'OVERSPEED'
   | 'GEOFENCE_ENTER'

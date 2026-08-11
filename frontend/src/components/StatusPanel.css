@@ -1,54 +1,107 @@
-.status-panel h2 {
-  margin: 0 0 4px;
+.status-panel-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 14px;
 }
 
-.status-line {
+.status-panel-icon {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: center;
+}
+
+.status-panel h2 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.status-subtitle {
+  margin: 2px 0 0;
   color: var(--color-text-muted);
-  margin: 0 0 16px;
+  font-size: 0.85rem;
 }
 
-.status-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: var(--color-text-muted);
-}
-
-.status-dot.moving {
-  background: var(--color-success);
-}
-
-.status-dot.idle {
-  background: var(--color-warning);
-}
-
-.offline-badge {
-  background: var(--color-danger);
-  color: white;
-  font-size: 0.75rem;
-  padding: 2px 8px;
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
   border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 20px;
+}
+
+.status-pill-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.status-pill-detail {
+  font-weight: 400;
+  opacity: 0.85;
+}
+
+.status-pill--good {
+  background: var(--color-good-soft);
+  color: var(--color-good);
+}
+
+.status-pill--warning {
+  background: var(--color-warning-soft);
+  color: var(--color-warning);
+}
+
+.status-pill--critical {
+  background: var(--color-critical-soft);
+  color: var(--color-critical);
 }
 
 .status-metrics {
   display: flex;
   gap: 24px;
+  flex-wrap: wrap;
 }
 
-.status-metrics > div {
+.status-metric {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.status-metric-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  background: var(--surface-2);
+  color: var(--color-text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.status-metric > div:last-child {
   display: flex;
   flex-direction: column;
+  line-height: 1.15;
 }
 
 .metric-value {
-  font-size: 1.75rem;
-  font-weight: 600;
+  font-size: 1.4rem;
+  font-weight: 700;
 }
 
 .metric-label {
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   color: var(--color-text-muted);
 }

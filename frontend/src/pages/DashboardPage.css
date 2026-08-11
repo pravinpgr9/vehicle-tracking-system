@@ -1,7 +1,7 @@
 .dashboard-page {
-  max-width: 1100px;
+  max-width: 1140px;
   margin: 0 auto;
-  padding: 24px;
+  padding: 28px 24px 48px;
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -16,6 +16,7 @@
 .dashboard-header h1 {
   font-size: 1.4rem;
   margin: 0;
+  letter-spacing: -0.01em;
 }
 
 .dashboard-header-actions {
@@ -27,19 +28,29 @@
 .dashboard-header-actions select {
   padding: 6px 10px;
   border: 1px solid var(--color-border);
-  border-radius: 6px;
+  border-radius: 8px;
+  background: var(--surface-1);
+  color: var(--color-text);
 }
 
 .dashboard-header-actions button {
-  padding: 6px 12px;
+  padding: 6px 14px;
   border: 1px solid var(--color-border);
-  border-radius: 6px;
-  background: var(--color-surface);
+  border-radius: 8px;
+  background: var(--surface-1);
+  color: var(--color-text);
   cursor: pointer;
+  font-weight: 500;
+}
+
+.dashboard-header-actions button:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
 }
 
 .dashboard-user {
   color: var(--color-text-muted);
+  font-size: 0.9rem;
 }
 
 .dashboard-grid {
@@ -50,19 +61,23 @@
 
 .dashboard-status,
 .dashboard-trips,
-.dashboard-alerts {
-  padding: 20px;
+.dashboard-alerts,
+.dashboard-chart {
+  padding: 22px;
 }
 
 .dashboard-map {
-  height: 360px;
+  min-height: 320px;
   overflow: hidden;
   padding: 0;
 }
 
 .dashboard-trips h3,
-.dashboard-alerts h3 {
-  margin-top: 0;
+.dashboard-alerts h3,
+.dashboard-chart h3 {
+  margin: 0 0 14px;
+  font-size: 0.95rem;
+  font-weight: 600;
 }
 
 .dashboard-alerts {
@@ -72,6 +87,13 @@
 .dashboard-alerts ul {
   margin: 0;
   padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dashboard-alerts li {
+  font-size: 0.9rem;
 }
 
 .dashboard-loading,
@@ -80,13 +102,13 @@
 }
 
 .dashboard-error {
-  color: var(--color-danger);
+  color: var(--color-critical);
 }
 
 .dashboard-error button {
-  border: 1px solid var(--color-danger);
+  border: 1px solid var(--color-critical);
   background: none;
-  color: var(--color-danger);
+  color: var(--color-critical);
   border-radius: 6px;
   padding: 2px 10px;
   cursor: pointer;

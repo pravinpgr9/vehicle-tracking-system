@@ -6,7 +6,8 @@ import { useVehicleSocket } from '../socket/useVehicleSocket';
 import { StatusPanel } from '../components/StatusPanel';
 import { TripList } from '../components/TripList';
 import { VehicleMap } from '../components/VehicleMap';
-import type { DashboardSummary, Trip, Vehicle } from '../api/types';
+import { DistanceChart } from '../components/DistanceChart';
+import type { DashboardSummary, Geofence, Trip, Vehicle } from '../api/types';
 import './DashboardPage.css';
 
 function errorMessage(error: unknown): string {
@@ -19,6 +20,7 @@ export function DashboardPage() {
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [trips, setTrips] = useState<Trip[]>([]);
+  const [geofences, setGeofences] = useState<Geofence[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [retryToken, setRetryToken] = useState(0);
@@ -30,12 +32,12 @@ export function DashboardPage() {
   const { liveLocation, liveTrip, recentAlerts } = useVehicleSocket(selectedVehicleId);
 
   useEffect(() => {
-    endpoints
-      .listVehicles()
-      .then((list) => {
-        setVehicles(list);
-        setSelectedVehicleId((current) => current ?? list[0]?.id ?? null);
-        if (list.length === 0) {
+    Promise.all([endpoints.listVehicles(), endpoints.listGeofences()])
+      .then(([vehicleList, geofenceList]) => {
+        setVehicles(vehicleList);
+        setGeofences(geofenceList);
+        setSelectedVehicleId((current) => current ?? vehicleList[0]?.id ?? null);
+        if (vehicleList.length === 0) {
           setIsLoading(false);
         }
       })
@@ -120,6 +122,7 @@ export function DashboardPage() {
               todayTrips={summary.todayTrips}
               todayDistanceKm={summary.todayDistanceKm}
               deviceOnline={summary.deviceStatus?.online ?? false}
+              deviceLastSeenAt={summary.deviceStatus?.lastSeenAt ?? null}
             />
           </div>
 
@@ -135,9 +138,14 @@ export function DashboardPage() {
             )}
           </div>
 
+          <div className="card dashboard-chart">
+            <h3>Distance, last 7 days</h3>
+            <DistanceChart trips={trips} />
+          </div>
+
           <div className="card dashboard-trips">
             <h3>Recent trips</h3>
-            <TripList trips={displayedTrips} />
+            <TripList trips={displayedTrips} geofences={geofences} />
           </div>
 
           {recentAlerts.length > 0 && (
