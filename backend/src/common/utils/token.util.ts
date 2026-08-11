@@ -1,4 +1,4 @@
-import { randomBytes, createHash, timingSafeEqual } from 'node:crypto';
+import { randomBytes, createHash } from 'node:crypto';
 
 const TOKEN_BYTES = 32;
 
@@ -14,12 +14,4 @@ export function generateToken(): string {
  */
 export function hashToken(token: string): string {
   return createHash('sha256').update(token).digest('hex');
-}
-
-export function verifyToken(token: string, hash: string): boolean {
-  const candidate = Buffer.from(hashToken(token));
-  const expected = Buffer.from(hash);
-  return (
-    candidate.length === expected.length && timingSafeEqual(candidate, expected)
-  );
 }
