@@ -91,16 +91,37 @@ export class TripDetectionService {
       return;
     }
 
+    // The trip actually began at the earlier of the two qualifying points,
+    // not the one that happened to trigger this check (`location`) — using
+    // `location` for both start and end would silently drop the distance
+    // already covered between the two points that established the trip.
+    const previous = recentPoints[1];
+    const initialDistanceMeters = haversineDistanceMeters(previous, location);
+    const initialDurationSeconds = Math.max(
+      0,
+      Math.round(
+        (location.recordedAt.getTime() - previous.recordedAt.getTime()) /
+          MILLISECONDS_PER_SECOND,
+      ),
+    );
+    const initialMaxSpeed = Math.max(previous.speed ?? 0, location.speed ?? 0);
+    const initialAverageSpeed =
+      initialDurationSeconds > 0
+        ? msToKmh(initialDistanceMeters / initialDurationSeconds)
+        : initialMaxSpeed;
+
     const trip = await this.prisma.trip.create({
       data: {
         vehicleId: location.vehicleId,
-        startedAt: location.recordedAt,
-        startLatitude: location.latitude,
-        startLongitude: location.longitude,
+        startedAt: previous.recordedAt,
+        startLatitude: previous.latitude,
+        startLongitude: previous.longitude,
         endLatitude: location.latitude,
         endLongitude: location.longitude,
-        maxSpeed: location.speed ?? 0,
-        averageSpeed: location.speed ?? 0,
+        distanceMeters: initialDistanceMeters,
+        durationSeconds: initialDurationSeconds,
+        maxSpeed: initialMaxSpeed,
+        averageSpeed: initialAverageSpeed,
         lastMovingAt: location.recordedAt,
       },
     });

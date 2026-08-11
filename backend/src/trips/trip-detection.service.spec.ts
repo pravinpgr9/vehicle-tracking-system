@@ -4,6 +4,7 @@ import { TripDetectionService } from './trip-detection.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AppEvent } from '../common/constants/events';
 import { LocationIngestedEvent } from '../common/events/location-ingested.event';
+import { haversineDistanceMeters } from '../common/utils/geo.util';
 import { Location, Trip, TripStatus } from '../generated/prisma/client';
 
 function buildLocation(overrides: Partial<Location> = {}): Location {
@@ -117,6 +118,99 @@ describe('TripDetectionService', () => {
       expect(eventEmitter.emit).toHaveBeenCalledWith(
         AppEvent.TRIP_STARTED,
         expect.anything(),
+      );
+    });
+
+    it('anchors the new trip at the earlier point, counting the distance already covered between them', async () => {
+      prisma.trip.findFirst.mockResolvedValue(null);
+      const previous = buildLocation({
+        speed: 15,
+        latitude: 20.0056,
+        longitude: 73.7891,
+        recordedAt: new Date('2026-08-10T17:00:00.000Z'),
+      });
+      const current = buildLocation({
+        speed: 20,
+        latitude: 20.007,
+        longitude: 73.791,
+        recordedAt: new Date('2026-08-10T17:00:10.000Z'),
+      });
+      // location.findMany is ordered newest-first: [current, previous].
+      prisma.location.findMany.mockResolvedValue([current, previous]);
+      prisma.trip.create.mockResolvedValue(buildTrip());
+
+      await service.handleLocationIngested(new LocationIngestedEvent(current));
+
+      const [{ data }] = prisma.trip.create.mock.calls[0] as [
+        { data: Partial<Trip> },
+      ];
+      expect(data.startLatitude).toBe(previous.latitude);
+      expect(data.startLongitude).toBe(previous.longitude);
+      expect(data.startedAt).toEqual(previous.recordedAt);
+      expect(data.endLatitude).toBe(current.latitude);
+      expect(data.endLongitude).toBe(current.longitude);
+      // The critical assertion: distance between the two starting points
+      // must be counted, not dropped as it was before this fix.
+      expect(data.distanceMeters).toBeCloseTo(
+        haversineDistanceMeters(previous, current),
+        5,
+      );
+      expect(data.maxSpeed).toBe(20);
+    });
+
+    it('accumulates total distance across three sequential points, matching distance(A,B) + distance(B,C)', async () => {
+      const pointA = buildLocation({
+        speed: 20,
+        latitude: 20.0056,
+        longitude: 73.7891,
+        recordedAt: new Date('2026-08-10T17:00:00.000Z'),
+      });
+      const pointB = buildLocation({
+        speed: 25,
+        latitude: 20.007,
+        longitude: 73.791,
+        recordedAt: new Date('2026-08-10T17:00:10.000Z'),
+      });
+      const pointC = buildLocation({
+        speed: 30,
+        latitude: 20.009,
+        longitude: 73.793,
+        recordedAt: new Date('2026-08-10T17:00:20.000Z'),
+      });
+
+      let currentTrip: Trip | null = null;
+      prisma.trip.findFirst.mockImplementation(() =>
+        Promise.resolve(currentTrip),
+      );
+      prisma.trip.create.mockImplementation((...args: unknown[]) => {
+        const { data } = args[0] as { data: Partial<Trip> };
+        currentTrip = { ...buildTrip(), ...data };
+        return Promise.resolve(currentTrip);
+      });
+      prisma.trip.update.mockImplementation((args) => {
+        currentTrip = { ...(currentTrip as Trip), ...args.data };
+        return Promise.resolve(currentTrip);
+      });
+
+      // Ingest A: only one point on record — no trip yet.
+      prisma.location.findMany.mockResolvedValue([pointA]);
+      await service.handleLocationIngested(new LocationIngestedEvent(pointA));
+      expect(currentTrip).toBeNull();
+
+      // Ingest B: A and B are 2 consecutive movers — trip starts, anchored
+      // at A, with distance already covering A->B.
+      prisma.location.findMany.mockResolvedValue([pointB, pointA]);
+      await service.handleLocationIngested(new LocationIngestedEvent(pointB));
+      const distanceAfterB = (currentTrip as unknown as Trip).distanceMeters;
+      const distanceAB = haversineDistanceMeters(pointA, pointB);
+      expect(distanceAfterB).toBeCloseTo(distanceAB, 5);
+
+      // Ingest C: trip continues, distance += B->C.
+      await service.handleLocationIngested(new LocationIngestedEvent(pointC));
+      const distanceBC = haversineDistanceMeters(pointB, pointC);
+      expect((currentTrip as unknown as Trip).distanceMeters).toBeCloseTo(
+        distanceAB + distanceBC,
+        5,
       );
     });
 
