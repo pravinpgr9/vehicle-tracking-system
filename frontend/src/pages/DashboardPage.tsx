@@ -1,12 +1,17 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../auth/useAuth';
 import { endpoints } from '../api/endpoints';
+import { ApiError } from '../api/client';
 import { useVehicleSocket } from '../socket/useVehicleSocket';
 import { StatusPanel } from '../components/StatusPanel';
 import { TripList } from '../components/TripList';
 import { VehicleMap } from '../components/VehicleMap';
 import type { DashboardSummary, Trip, Vehicle } from '../api/types';
 import './DashboardPage.css';
+
+function errorMessage(error: unknown): string {
+  return error instanceof ApiError ? error.message : 'Something went wrong';
+}
 
 export function DashboardPage() {
   const { user, logout } = useAuth();
@@ -15,15 +20,30 @@ export function DashboardPage() {
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [trips, setTrips] = useState<Trip[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [retryToken, setRetryToken] = useState(0);
+  const retry = useCallback(() => {
+    setError(null);
+    setRetryToken((token) => token + 1);
+  }, []);
 
   const { liveLocation, liveTrip, recentAlerts } = useVehicleSocket(selectedVehicleId);
 
   useEffect(() => {
-    endpoints.listVehicles().then((list) => {
-      setVehicles(list);
-      setSelectedVehicleId((current) => current ?? list[0]?.id ?? null);
-    });
-  }, []);
+    endpoints
+      .listVehicles()
+      .then((list) => {
+        setVehicles(list);
+        setSelectedVehicleId((current) => current ?? list[0]?.id ?? null);
+        if (list.length === 0) {
+          setIsLoading(false);
+        }
+      })
+      .catch((err: unknown) => {
+        setError(errorMessage(err));
+        setIsLoading(false);
+      });
+  }, [retryToken]);
 
   useEffect(() => {
     if (!selectedVehicleId) {
@@ -38,8 +58,9 @@ export function DashboardPage() {
         setSummary(summaryResult);
         setTrips(tripsResult.items);
       })
+      .catch((err: unknown) => setError(errorMessage(err)))
       .finally(() => setIsLoading(false));
-  }, [selectedVehicleId]);
+  }, [selectedVehicleId, retryToken]);
 
   const selectedVehicle = vehicles.find((v) => v.id === selectedVehicleId);
   const location = liveLocation ?? summary?.currentLocation ?? null;
@@ -72,15 +93,24 @@ export function DashboardPage() {
         </div>
       </header>
 
-      {isLoading && <p className="dashboard-loading">Loading…</p>}
+      {error && (
+        <p className="dashboard-error">
+          {error}{' '}
+          <button type="button" onClick={retry}>
+            Retry
+          </button>
+        </p>
+      )}
 
-      {!isLoading && !selectedVehicle && (
+      {!error && isLoading && <p className="dashboard-loading">Loading…</p>}
+
+      {!error && !isLoading && !selectedVehicle && (
         <p className="dashboard-empty">
           No vehicles yet. Create one via the API to get started.
         </p>
       )}
 
-      {!isLoading && selectedVehicle && summary && (
+      {!error && !isLoading && selectedVehicle && summary && (
         <div className="dashboard-grid">
           <div className="card dashboard-status">
             <StatusPanel

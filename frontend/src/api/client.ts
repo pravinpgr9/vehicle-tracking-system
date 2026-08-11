@@ -46,11 +46,28 @@ async function request<T>(
     },
   });
 
-  if (response.status === 204) {
-    return undefined as T;
+  // Empty body covers 204 No Content, but also guards against a stray 304
+  // (e.g. from an intermediary that ignores Cache-Control: no-store) or
+  // any other response with nothing to parse — safer than special-casing
+  // one status code and letting everything else hit JSON.parse blind.
+  const text = await response.text();
+  if (!text) {
+    if (response.ok) {
+      return undefined as T;
+    }
+    throw new ApiError('EMPTY_RESPONSE', `Request failed with status ${response.status}`);
   }
 
-  const body = (await response.json()) as ApiSuccessBody<T> | ApiErrorBody;
+  let body: ApiSuccessBody<T> | ApiErrorBody;
+  try {
+    body = JSON.parse(text) as ApiSuccessBody<T> | ApiErrorBody;
+  } catch {
+    throw new ApiError(
+      'INVALID_RESPONSE',
+      `Could not parse response as JSON (status ${response.status})`,
+    );
+  }
+
   if (!body.success) {
     throw new ApiError(body.error.code, body.error.message);
   }
