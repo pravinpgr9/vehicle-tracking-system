@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <link rel="icon" href="data:," />
+    <title>GPS Tracker</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --surface-0: #f4f5f7;
+        --surface-1: #ffffff;
+        --border: #e5e7eb;
+        --text: #14161a;
+        --text-muted: #6b7280;
+        --primary: #2a78d6;
+        --good: #0ca30c;
+        --critical: #d03b3b;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        background: var(--surface-0);
+        color: var(--text);
+        padding: 20px;
+        padding-bottom: 40px;
+      }
+      h1 {
+        font-size: 1.2rem;
+        margin: 0 0 4px;
+      }
+      p.subtitle {
+        color: var(--text-muted);
+        margin: 0 0 20px;
+        font-size: 0.9rem;
+      }
+      .card {
+        background: var(--surface-1);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 16px;
+        margin-bottom: 16px;
+      }
+      label {
+        display: block;
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        margin-bottom: 4px;
+        margin-top: 12px;
+      }
+      label:first-child {
+        margin-top: 0;
+      }
+      input {
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        font-size: 1rem;
+        background: var(--surface-1);
+        color: var(--text);
+      }
+      button {
+        width: 100%;
+        padding: 14px;
+        border: none;
+        border-radius: 10px;
+        font-size: 1rem;
+        font-weight: 600;
+        margin-top: 16px;
+        cursor: pointer;
+      }
+      #startBtn {
+        background: var(--good);
+        color: white;
+      }
+      #stopBtn {
+        background: var(--critical);
+        color: white;
+      }
+      .status-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 6px 0;
+        border-bottom: 1px solid var(--border);
+        font-size: 0.9rem;
+      }
+      .status-row:last-child {
+        border-bottom: none;
+      }
+      .status-label {
+        color: var(--text-muted);
+      }
+      #statusPill {
+        display: inline-block;
+        padding: 3px 10px;
+        border-radius: 999px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        background: #e5e7eb;
+        color: var(--text-muted);
+      }
+      #statusPill.tracking {
+        background: #e6f6e6;
+        color: var(--good);
+      }
+      #statusPill.error {
+        background: #fbe9e9;
+        color: var(--critical);
+      }
+      #log {
+        font-family: ui-monospace, monospace;
+        font-size: 0.78rem;
+        max-height: 180px;
+        overflow-y: auto;
+        white-space: pre-wrap;
+        color: var(--text-muted);
+      }
+      #log div {
+        padding: 2px 0;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>GPS Tracker</h1>
+    <p class="subtitle">
+      Sends this phone's real GPS to the Vehicle Tracking API. Values persist in this
+      browser between visits.
+    </p>
+
+    <div class="card">
+      <label for="apiBase">API base URL</label>
+      <input id="apiBase" placeholder="https://your-backend.example.com/api/v1" />
+
+      <label for="deviceToken">Device token</label>
+      <input id="deviceToken" placeholder="from POST /vehicles/:id/devices" />
+
+      <label for="deviceId">Device identifier</label>
+      <input id="deviceId" placeholder="e.g. android-car-001" />
+
+      <label for="vehicleId">Vehicle ID</label>
+      <input id="vehicleId" placeholder="the vehicle's UUID" />
+
+      <label for="intervalSeconds">Send interval (seconds)</label>
+      <input id="intervalSeconds" type="number" min="2" value="5" />
+
+      <button id="startBtn" type="button">Start tracking</button>
+      <button id="stopBtn" type="button" style="display: none">Stop tracking</button>
+    </div>
+
+    <div class="card">
+      <div class="status-row">
+        <span class="status-label">Status</span>
+        <span id="statusPill">Idle</span>
+      </div>
+      <div class="status-row">
+        <span class="status-label">Position</span>
+        <span id="position">—</span>
+      </div>
+      <div class="status-row">
+        <span class="status-label">Speed</span>
+        <span id="speed">—</span>
+      </div>
+      <div class="status-row">
+        <span class="status-label">Accuracy</span>
+        <span id="accuracy">—</span>
+      </div>
+      <div class="status-row">
+        <span class="status-label">Last send</span>
+        <span id="lastSend">—</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div id="log"></div>
+    </div>
+
+    <script>
+      const STORAGE_KEY = 'gps-tracker-settings';
+      const MS_PER_SECOND = 1000;
+      const MPS_TO_KMH = 3.6;
+
+      const fields = ['apiBase', 'deviceToken', 'deviceId', 'vehicleId', 'intervalSeconds'];
+      const els = Object.fromEntries(fields.map((id) => [id, document.getElementById(id)]));
+      const startBtn = document.getElementById('startBtn');
+      const stopBtn = document.getElementById('stopBtn');
+      const statusPill = document.getElementById('statusPill');
+      const positionEl = document.getElementById('position');
+      const speedEl = document.getElementById('speed');
+      const accuracyEl = document.getElementById('accuracy');
+      const lastSendEl = document.getElementById('lastSend');
+      const logEl = document.getElementById('log');
+
+      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}');
+      for (const field of fields) {
+        if (saved[field] !== undefined) els[field].value = saved[field];
+      }
+
+      function saveSettings() {
+        const values = Object.fromEntries(fields.map((id) => [id, els[id].value]));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(values));
+      }
+
+      function log(message) {
+        const line = document.createElement('div');
+        line.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+        logEl.prepend(line);
+        while (logEl.childElementCount > 30) logEl.lastChild.remove();
+      }
+
+      function setStatus(text, cls) {
+        statusPill.textContent = text;
+        statusPill.className = cls ?? '';
+      }
+
+      let timerId = null;
+
+      function sendPosition(position) {
+        const { latitude, longitude, speed, heading, accuracy } = position.coords;
+        positionEl.textContent = `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
+        accuracyEl.textContent = `${Math.round(accuracy)} m`;
+        const speedKmh = typeof speed === 'number' && speed !== null ? speed * MPS_TO_KMH : 0;
+        speedEl.textContent = `${speedKmh.toFixed(1)} km/h`;
+
+        const body = {
+          deviceId: els.deviceId.value,
+          vehicleId: els.vehicleId.value,
+          latitude,
+          longitude,
+          speed: speedKmh,
+          heading: typeof heading === 'number' && heading !== null ? heading : undefined,
+          accuracy,
+          batteryLevel: undefined,
+          recordedAt: new Date(position.timestamp).toISOString(),
+        };
+
+        fetch(`${els.apiBase.value.replace(/\/$/, '')}/tracking/location`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Device ${els.deviceToken.value}`,
+          },
+          body: JSON.stringify(body),
+        })
+          .then(async (response) => {
+            const text = await response.text();
+            if (!response.ok) {
+              throw new Error(`${response.status}: ${text}`);
+            }
+            lastSendEl.textContent = new Date().toLocaleTimeString();
+            log(`sent ${latitude.toFixed(5)}, ${longitude.toFixed(5)} @ ${speedKmh.toFixed(1)} km/h`);
+          })
+          .catch((error) => {
+            setStatus('Send failed', 'error');
+            log(`error: ${error.message}`);
+          });
+      }
+
+      function tick() {
+        navigator.geolocation.getCurrentPosition(
+          sendPosition,
+          (error) => {
+            setStatus('GPS error', 'error');
+            log(`geolocation error: ${error.message}`);
+          },
+          { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
+        );
+      }
+
+      startBtn.addEventListener('click', () => {
+        if (!els.apiBase.value || !els.deviceToken.value || !els.deviceId.value || !els.vehicleId.value) {
+          log('Fill in API base URL, device token, device identifier, and vehicle ID first.');
+          return;
+        }
+        if (!window.isSecureContext) {
+          log('Warning: this page is not served over HTTPS — the browser will likely block GPS access.');
+        }
+        saveSettings();
+        setStatus('Tracking', 'tracking');
+        startBtn.style.display = 'none';
+        stopBtn.style.display = 'block';
+        tick();
+        const intervalMs = Math.max(2, Number(els.intervalSeconds.value) || 5) * MS_PER_SECOND;
+        timerId = setInterval(tick, intervalMs);
+      });
+
+      stopBtn.addEventListener('click', () => {
+        if (timerId) clearInterval(timerId);
+        timerId = null;
+        setStatus('Idle');
+        startBtn.style.display = 'block';
+        stopBtn.style.display = 'none';
+        log('Stopped.');
+      });
+    </script>
+  </body>
+</html>
