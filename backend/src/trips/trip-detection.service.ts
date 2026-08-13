@@ -6,7 +6,10 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AppEvent } from '../common/constants/events';
 import { LocationIngestedEvent } from '../common/events/location-ingested.event';
 import { haversineDistanceMeters, msToKmh } from '../common/utils/geo.util';
-import { Location, Trip } from '../generated/prisma/client';
+import { Location, Prisma, Trip } from '../generated/prisma/client';
+
+/** Postgres unique-violation code, raised by the one-active-trip-per-vehicle index. */
+const UNIQUE_CONSTRAINT_VIOLATION = 'P2002';
 
 const MILLISECONDS_PER_SECOND = 1000;
 const SECONDS_PER_MINUTE = 60;
@@ -110,21 +113,42 @@ export class TripDetectionService {
         ? msToKmh(initialDistanceMeters / initialDurationSeconds)
         : initialMaxSpeed;
 
-    const trip = await this.prisma.trip.create({
-      data: {
-        vehicleId: location.vehicleId,
-        startedAt: previous.recordedAt,
-        startLatitude: previous.latitude,
-        startLongitude: previous.longitude,
-        endLatitude: location.latitude,
-        endLongitude: location.longitude,
-        distanceMeters: initialDistanceMeters,
-        durationSeconds: initialDurationSeconds,
-        maxSpeed: initialMaxSpeed,
-        averageSpeed: initialAverageSpeed,
-        lastMovingAt: location.recordedAt,
-      },
-    });
+    let trip: Trip;
+    try {
+      trip = await this.prisma.trip.create({
+        data: {
+          vehicleId: location.vehicleId,
+          startedAt: previous.recordedAt,
+          startLatitude: previous.latitude,
+          startLongitude: previous.longitude,
+          endLatitude: location.latitude,
+          endLongitude: location.longitude,
+          distanceMeters: initialDistanceMeters,
+          durationSeconds: initialDurationSeconds,
+          maxSpeed: initialMaxSpeed,
+          averageSpeed: initialAverageSpeed,
+          lastMovingAt: location.recordedAt,
+        },
+      });
+    } catch (error) {
+      // Two points ingested close together can both reach this method before
+      // either has inserted a trip — the DB's one-active-trip-per-vehicle
+      // index (see migrations) rejects the loser instead of letting it
+      // create a second concurrent trip. Fold this point into the winner.
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === UNIQUE_CONSTRAINT_VIOLATION
+      ) {
+        const activeTrip = await this.prisma.trip.findFirst({
+          where: { vehicleId: location.vehicleId, status: 'ACTIVE' },
+        });
+        if (activeTrip) {
+          await this.continueTrip(activeTrip, location);
+        }
+        return;
+      }
+      throw error;
+    }
 
     this.logger.log(
       `Trip started: vehicle=${location.vehicleId} trip=${trip.id}`,

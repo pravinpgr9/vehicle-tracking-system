@@ -159,6 +159,11 @@ model Trip {
   @@index([vehicleId])
   @@index([vehicleId, status])
   @@map("trips")
+  // A partial unique index — one row per vehicle where status = 'ACTIVE' —
+  // is added directly via migration.sql (see
+  // 20260813181716_one_active_trip_per_vehicle), since Prisma's schema DSL
+  // can't express a WHERE clause on an index. `prisma migrate dev`'s drift
+  // detection may propose dropping it since it isn't declared here; don't.
 }
 
 model Geofence {

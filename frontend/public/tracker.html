@@ -216,14 +216,23 @@
         statusPill.className = cls ?? '';
       }
 
-      let timerId = null;
+      let watchId = null;
+      let watchdogId = null;
+      let lastFixAt = null;
+      let lastSentAt = 0;
+      let sendIntervalMs = 5 * MS_PER_SECOND;
 
-      function sendPosition(position) {
-        const { latitude, longitude, speed, heading, accuracy } = position.coords;
+      function updateDisplay(position) {
+        const { latitude, longitude, speed, accuracy } = position.coords;
         positionEl.textContent = `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
         accuracyEl.textContent = `${Math.round(accuracy)} m`;
         const speedKmh = typeof speed === 'number' && speed !== null ? speed * MPS_TO_KMH : 0;
         speedEl.textContent = `${speedKmh.toFixed(1)} km/h`;
+      }
+
+      function sendPosition(position) {
+        const { latitude, longitude, speed, heading, accuracy } = position.coords;
+        const speedKmh = typeof speed === 'number' && speed !== null ? speed * MPS_TO_KMH : 0;
 
         const body = {
           deviceId: els.deviceId.value,
@@ -259,15 +268,56 @@
           });
       }
 
-      function tick() {
-        navigator.geolocation.getCurrentPosition(
-          sendPosition,
-          (error) => {
-            setStatus('GPS error', 'error');
-            log(`geolocation error: ${error.message}`);
-          },
-          { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
-        );
+      function onFix(position) {
+        lastFixAt = Date.now();
+        if (statusPill.textContent !== 'Tracking') {
+          setStatus('Tracking', 'tracking');
+        }
+        updateDisplay(position);
+
+        const now = Date.now();
+        if (now - lastSentAt >= sendIntervalMs) {
+          lastSentAt = now;
+          sendPosition(position);
+        }
+      }
+
+      function onFixError(error) {
+        setStatus('GPS error', 'error');
+        log(`geolocation error: ${error.message}`);
+        // PERMISSION_DENIED can't self-heal — the OS won't grant location
+        // again on its own. Anything else (TIMEOUT, POSITION_UNAVAILABLE) is
+        // usually transient and left to the watchdog below to recover from.
+        if (error.code === error.PERMISSION_DENIED) {
+          log('Location permission denied — grant permission and tap Start again.');
+          stopTracking();
+        }
+      }
+
+      function startWatch() {
+        if (watchId !== null) {
+          navigator.geolocation.clearWatch(watchId);
+        }
+        watchId = navigator.geolocation.watchPosition(onFix, onFixError, {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0,
+        });
+      }
+
+      function stopTracking() {
+        if (watchId !== null) {
+          navigator.geolocation.clearWatch(watchId);
+          watchId = null;
+        }
+        if (watchdogId) {
+          clearInterval(watchdogId);
+          watchdogId = null;
+        }
+        setStatus('Idle');
+        startBtn.style.display = 'block';
+        stopBtn.style.display = 'none';
+        log('Stopped.');
       }
 
       startBtn.addEventListener('click', () => {
@@ -282,19 +332,25 @@
         setStatus('Tracking', 'tracking');
         startBtn.style.display = 'none';
         stopBtn.style.display = 'block';
-        tick();
-        const intervalMs = Math.max(2, Number(els.intervalSeconds.value) || 5) * MS_PER_SECOND;
-        timerId = setInterval(tick, intervalMs);
+        sendIntervalMs = Math.max(2, Number(els.intervalSeconds.value) || 5) * MS_PER_SECOND;
+        lastFixAt = Date.now();
+        lastSentAt = 0;
+        startWatch();
+        // Some Android/Chrome versions leave watchPosition wedged on repeated
+        // TIMEOUT errors even once GPS is available again. Detect a long gap
+        // since the last real fix and silently restart the subscription
+        // instead of requiring a manual Stop + Start.
+        const staleMs = sendIntervalMs * 4;
+        watchdogId = setInterval(() => {
+          if (Date.now() - lastFixAt > staleMs) {
+            log(`No GPS fix for ${Math.round(staleMs / MS_PER_SECOND)}s — restarting location watch.`);
+            lastFixAt = Date.now();
+            startWatch();
+          }
+        }, sendIntervalMs);
       });
 
-      stopBtn.addEventListener('click', () => {
-        if (timerId) clearInterval(timerId);
-        timerId = null;
-        setStatus('Idle');
-        startBtn.style.display = 'block';
-        stopBtn.style.display = 'none';
-        log('Stopped.');
-      });
+      stopBtn.addEventListener('click', stopTracking);
     </script>
   </body>
 </html>
