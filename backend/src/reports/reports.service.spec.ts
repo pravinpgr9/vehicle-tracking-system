@@ -1,3 +1,4 @@
+import { ConfigService } from '@nestjs/config';
 import { ReportsService } from './reports.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { VehiclesService } from '../vehicles/vehicles.service';
@@ -33,10 +34,12 @@ describe('ReportsService', () => {
   beforeEach(() => {
     prisma = { trip: { findMany: jest.fn<Promise<Trip[]>, unknown[]>() } };
     vehiclesService = { findOneOwned: jest.fn().mockResolvedValue({}) };
+    const configService = { get: (_key: string, fallback: number) => fallback };
 
     service = new ReportsService(
       prisma as unknown as PrismaService,
       vehiclesService as unknown as VehiclesService,
+      configService as unknown as ConfigService,
     );
   });
 

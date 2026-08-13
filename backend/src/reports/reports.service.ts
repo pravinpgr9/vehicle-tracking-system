@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { VehiclesService } from '../vehicles/vehicles.service';
 import {
@@ -29,15 +30,23 @@ export class ReportsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly vehiclesService: VehiclesService,
+    private readonly configService: ConfigService,
   ) {}
+
+  private get utcOffsetMinutes(): number {
+    return this.configService.get<number>('report.utcOffsetMinutes', 0);
+  }
 
   async getDaily(
     userId: string,
     query: DailyReportQueryDto,
   ): Promise<DailyReportResponseDto> {
     await this.vehiclesService.findOneOwned(userId, query.vehicleId);
-    const date = query.date ?? todayDateString();
-    const trips = await this.tripsWithin(query.vehicleId, dayRange(date));
+    const date = query.date ?? todayDateString(this.utcOffsetMinutes);
+    const trips = await this.tripsWithin(
+      query.vehicleId,
+      dayRange(date, this.utcOffsetMinutes),
+    );
     return new DailyReportResponseDto({ date, ...this.aggregate(trips) });
   }
 
@@ -46,8 +55,11 @@ export class ReportsService {
     query: MonthlyReportQueryDto,
   ): Promise<MonthlyReportResponseDto> {
     await this.vehiclesService.findOneOwned(userId, query.vehicleId);
-    const month = query.month ?? currentMonthString();
-    const trips = await this.tripsWithin(query.vehicleId, monthRange(month));
+    const month = query.month ?? currentMonthString(this.utcOffsetMinutes);
+    const trips = await this.tripsWithin(
+      query.vehicleId,
+      monthRange(month, this.utcOffsetMinutes),
+    );
     const aggregate = this.aggregate(trips);
     const averageTripDistanceKm =
       aggregate.totalTrips > 0

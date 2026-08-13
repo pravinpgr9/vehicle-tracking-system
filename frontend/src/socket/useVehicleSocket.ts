@@ -27,6 +27,16 @@ export function useVehicleSocket(vehicleId: string | null): VehicleSocketState {
   });
 
   useEffect(() => {
+    // Switching vehicles must drop the previous vehicle's live trip/location —
+    // otherwise they stay pinned at the top of "Recent trips" for the newly
+    // selected vehicle until a fresh event happens to arrive for it.
+    setState({
+      connected: false,
+      liveLocation: null,
+      liveTrip: null,
+      recentAlerts: [],
+    });
+
     if (!vehicleId) {
       return;
     }

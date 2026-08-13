@@ -81,7 +81,7 @@ export class TripDetectionService {
 
     const recentPoints = await this.prisma.location.findMany({
       where: { vehicleId: location.vehicleId },
-      orderBy: { recordedAt: 'desc' },
+      orderBy: [{ recordedAt: 'desc' }, { id: 'desc' }],
       take: TRIP_START_CONSECUTIVE_POINTS,
     });
     const isConsistentlyMoving =

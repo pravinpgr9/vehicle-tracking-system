@@ -64,12 +64,30 @@ export function DashboardPage() {
       .finally(() => setIsLoading(false));
   }, [selectedVehicleId, retryToken]);
 
+  // A trip only lives in `liveTrip` (pinned via the socket) while it's still
+  // ACTIVE. Once it completes, fold it into `trips` so it stays visible in
+  // "Recent trips" even after a later trip takes over `liveTrip` — otherwise
+  // the just-finished trip would vanish until the next full refetch.
+  useEffect(() => {
+    if (!liveTrip || liveTrip.status !== 'COMPLETED') {
+      return;
+    }
+    setTrips((prev) => [liveTrip, ...prev.filter((t) => t.id !== liveTrip.id)]);
+    if (selectedVehicleId) {
+      endpoints
+        .getDashboardSummary(selectedVehicleId)
+        .then(setSummary)
+        .catch(() => undefined);
+    }
+  }, [liveTrip, selectedVehicleId]);
+
   const selectedVehicle = vehicles.find((v) => v.id === selectedVehicleId);
   const location = liveLocation ?? summary?.currentLocation ?? null;
   const speedKmh = liveLocation?.speed ?? summary?.currentSpeed ?? null;
-  const displayedTrips = liveTrip
-    ? [liveTrip, ...trips.filter((t) => t.id !== liveTrip.id)]
-    : trips;
+  const displayedTrips =
+    liveTrip && liveTrip.status !== 'COMPLETED'
+      ? [liveTrip, ...trips.filter((t) => t.id !== liveTrip.id)]
+      : trips;
 
   return (
     <div className="dashboard-page">

@@ -6,6 +6,10 @@ export interface AppConfig {
   corsOrigin: string;
 }
 
+export interface ReportConfig {
+  utcOffsetMinutes: number;
+}
+
 export interface DatabaseConfig {
   url: string;
 }
@@ -44,6 +48,7 @@ export interface Configuration {
   alert: AlertConfig;
   gps: GpsConfig;
   throttle: ThrottleConfig;
+  report: ReportConfig;
 }
 
 export default (): Configuration => ({
@@ -77,5 +82,8 @@ export default (): Configuration => ({
   throttle: {
     ttlSeconds: Number(process.env.THROTTLE_TTL_SECONDS ?? 60),
     limit: Number(process.env.THROTTLE_LIMIT ?? 120),
+  },
+  report: {
+    utcOffsetMinutes: Number(process.env.REPORT_UTC_OFFSET_MINUTES ?? 0),
   },
 });

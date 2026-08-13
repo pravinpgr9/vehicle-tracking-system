@@ -35,7 +35,9 @@ export class DashboardService {
       this.trackingService.findCurrentLocation(vehicleId),
       this.reportsService.getDaily(userId, {
         vehicleId,
-        date: todayDateString(),
+        date: todayDateString(
+          this.configService.get<number>('report.utcOffsetMinutes', 0),
+        ),
       }),
       this.prisma.trip.findFirst({
         where: { vehicleId },
