@@ -1,3 +1,4 @@
+import { join } from 'path';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
@@ -31,19 +32,16 @@ async function bootstrap(): Promise<void> {
       'device-token',
     )
     .build();
-  const document = SwaggerModule.createDocument(app, swaggerConfig);
-	
-SwaggerModule.setup('api/docs', app, document, {
-  customCssUrl: [
-    'https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css',
-  ],
-  customJs: [
-    'https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js',
-    'https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-standalone-preset.js',
-  ],
-});
 
-  //SwaggerModule.setup('api/docs', app, document);
+  const document = SwaggerModule.createDocument(app, swaggerConfig);
+
+  SwaggerModule.setup('api/docs', app, document, {
+    customSwaggerUiPath: join(
+      process.cwd(),
+      'node_modules',
+      'swagger-ui-dist',
+    ),
+  });
 
   const port = config.get<number>('app.port', 3000);
   await app.listen(port);
