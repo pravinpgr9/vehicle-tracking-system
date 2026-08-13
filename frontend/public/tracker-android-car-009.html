@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <link rel="icon" href="data:," />
+    <title>GPS Tracker — android-car-009</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --surface-0: #f4f5f7;
+        --surface-1: #ffffff;
+        --border: #e5e7eb;
+        --text: #14161a;
+        --text-muted: #6b7280;
+        --good: #0ca30c;
+        --critical: #d03b3b;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        background: var(--surface-0);
+        color: var(--text);
+        padding: 20px;
+        padding-bottom: 40px;
+      }
+      h1 {
+        font-size: 1.2rem;
+        margin: 0 0 4px;
+      }
+      p.subtitle {
+        color: var(--text-muted);
+        margin: 0 0 20px;
+        font-size: 0.9rem;
+      }
+      .card {
+        background: var(--surface-1);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 16px;
+        margin-bottom: 16px;
+      }
+      .status-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 6px 0;
+        border-bottom: 1px solid var(--border);
+        font-size: 0.9rem;
+      }
+      .status-row:last-child {
+        border-bottom: none;
+      }
+      .status-label {
+        color: var(--text-muted);
+      }
+      .mono {
+        font-family: ui-monospace, monospace;
+        font-size: 0.82rem;
+      }
+      button {
+        width: 100%;
+        padding: 16px;
+        border: none;
+        border-radius: 10px;
+        font-size: 1.05rem;
+        font-weight: 600;
+        margin-top: 4px;
+        cursor: pointer;
+      }
+      #trackBtn {
+        background: var(--good);
+        color: white;
+      }
+      #trackBtn.tracking {
+        background: var(--critical);
+      }
+      #statusPill {
+        display: inline-block;
+        padding: 3px 10px;
+        border-radius: 999px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        background: #e5e7eb;
+        color: var(--text-muted);
+      }
+      #statusPill.tracking {
+        background: #e6f6e6;
+        color: var(--good);
+      }
+      #statusPill.error {
+        background: #fbe9e9;
+        color: var(--critical);
+      }
+      .warning {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        margin-top: 12px;
+      }
+      #log {
+        font-family: ui-monospace, monospace;
+        font-size: 0.78rem;
+        max-height: 160px;
+        overflow-y: auto;
+        white-space: pre-wrap;
+        color: var(--text-muted);
+      }
+      #log div {
+        padding: 2px 0;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>GPS Tracker</h1>
+    <p class="subtitle">Vehicle <span class="mono">android-car-009</span> · tap Track to start.</p>
+
+    <div class="card">
+      <button id="trackBtn" type="button">Track</button>
+      <p class="warning">
+        Keep this tab open and the screen on while tracking — mobile browsers pause JavaScript
+        (and GPS updates) once the screen locks or the tab is fully backgrounded. This page
+        requests a wake lock automatically to help with that.
+      </p>
+    </div>
+
+    <div class="card">
+      <div class="status-row">
+        <span class="status-label">Status</span>
+        <span id="statusPill">Idle</span>
+      </div>
+      <div class="status-row">
+        <span class="status-label">Position</span>
+        <span id="position">—</span>
+      </div>
+      <div class="status-row">
+        <span class="status-label">Speed</span>
+        <span id="speed">—</span>
+      </div>
+      <div class="status-row">
+        <span class="status-label">Accuracy</span>
+        <span id="accuracy">—</span>
+      </div>
+      <div class="status-row">
+        <span class="status-label">Last send</span>
+        <span id="lastSend">—</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div id="log"></div>
+    </div>
+
+    <script>
+      // Locked to this one device/vehicle — no editable fields, just Track/Stop.
+      const API_BASE = 'https://vehicle-tracking-system-ivory.vercel.app/api/v1';
+      const DEVICE_TOKEN = '366bb504c50777457435ea051c6a0fccc6f723f8968268be8feae7ecfe269cfe';
+      const DEVICE_ID = 'android-car-009';
+      const VEHICLE_ID = '20704019-06e6-489e-bf3a-097f8e492d99';
+      const INTERVAL_SECONDS = 5;
+
+      const MS_PER_SECOND = 1000;
+      const MPS_TO_KMH = 3.6;
+
+      const trackBtn = document.getElementById('trackBtn');
+      const statusPill = document.getElementById('statusPill');
+      const positionEl = document.getElementById('position');
+      const speedEl = document.getElementById('speed');
+      const accuracyEl = document.getElementById('accuracy');
+      const lastSendEl = document.getElementById('lastSend');
+      const logEl = document.getElementById('log');
+
+      function log(message) {
+        const line = document.createElement('div');
+        line.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+        logEl.prepend(line);
+        while (logEl.childElementCount > 30) logEl.lastChild.remove();
+      }
+
+      function setStatus(text, cls) {
+        statusPill.textContent = text;
+        statusPill.className = cls ?? '';
+      }
+
+      let timerId = null;
+      let wakeLock = null;
+
+      async function requestWakeLock() {
+        try {
+          if ('wakeLock' in navigator) {
+            wakeLock = await navigator.wakeLock.request('screen');
+            wakeLock.addEventListener('release', () => log('Screen wake lock released.'));
+            log('Screen wake lock acquired.');
+          }
+        } catch (error) {
+          log(`Wake lock unavailable: ${error.message}`);
+        }
+      }
+
+      function releaseWakeLock() {
+        if (wakeLock) {
+          wakeLock.release().catch(() => undefined);
+          wakeLock = null;
+        }
+      }
+
+      // Re-acquire the wake lock if the tab regains visibility while still tracking
+      // (the OS releases it automatically when the tab/screen goes away).
+      document.addEventListener('visibilitychange', () => {
+        if (timerId && document.visibilityState === 'visible' && !wakeLock) {
+          requestWakeLock();
+        }
+      });
+
+      function sendPosition(position) {
+        const { latitude, longitude, speed, heading, accuracy } = position.coords;
+        positionEl.textContent = `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
+        accuracyEl.textContent = `${Math.round(accuracy)} m`;
+        const speedKmh = typeof speed === 'number' && speed !== null ? speed * MPS_TO_KMH : 0;
+        speedEl.textContent = `${speedKmh.toFixed(1)} km/h`;
+
+        const body = {
+          deviceId: DEVICE_ID,
+          vehicleId: VEHICLE_ID,
+          latitude,
+          longitude,
+          speed: speedKmh,
+          heading: typeof heading === 'number' && heading !== null ? heading : undefined,
+          accuracy,
+          batteryLevel: undefined,
+          recordedAt: new Date(position.timestamp).toISOString(),
+        };
+
+        fetch(`${API_BASE.replace(/\/$/, '')}/tracking/location`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Device ${DEVICE_TOKEN}`,
+          },
+          body: JSON.stringify(body),
+        })
+          .then(async (response) => {
+            const text = await response.text();
+            if (!response.ok) {
+              throw new Error(`${response.status}: ${text}`);
+            }
+            lastSendEl.textContent = new Date().toLocaleTimeString();
+            log(`sent ${latitude.toFixed(5)}, ${longitude.toFixed(5)} @ ${speedKmh.toFixed(1)} km/h`);
+          })
+          .catch((error) => {
+            setStatus('Send failed', 'error');
+            log(`error: ${error.message}`);
+          });
+      }
+
+      function tick() {
+        navigator.geolocation.getCurrentPosition(
+          sendPosition,
+          (error) => {
+            setStatus('GPS error', 'error');
+            log(`geolocation error: ${error.message}`);
+          },
+          { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
+        );
+      }
+
+      function startTracking() {
+        if (!window.isSecureContext) {
+          log('Warning: this page is not served over HTTPS — the browser will likely block GPS access.');
+        }
+        setStatus('Tracking', 'tracking');
+        trackBtn.textContent = 'Stop';
+        trackBtn.classList.add('tracking');
+        requestWakeLock();
+        tick();
+        timerId = setInterval(tick, INTERVAL_SECONDS * MS_PER_SECOND);
+      }
+
+      function stopTracking() {
+        if (timerId) clearInterval(timerId);
+        timerId = null;
+        releaseWakeLock();
+        setStatus('Idle');
+        trackBtn.textContent = 'Track';
+        trackBtn.classList.remove('tracking');
+        log('Stopped.');
+      }
+
+      trackBtn.addEventListener('click', () => {
+        if (timerId) {
+          stopTracking();
+        } else {
+          startTracking();
+        }
+      });
+    </script>
+  </body>
+</html>
