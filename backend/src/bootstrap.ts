@@ -8,6 +8,7 @@ import { ConfigService } from '@nestjs/config';
 import type { Express, NextFunction, Request, Response } from 'express';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
+import { SWAGGER_UI_CDN_ORIGIN } from './swagger.constants';
 
 /**
  * Shared app configuration between the real bootstrap (main.ts) and e2e
@@ -28,7 +29,22 @@ export function configureApp(app: INestApplication): void {
     next();
   });
 
-  app.use(helmet());
+  // Swagger UI's JS/CSS are loaded from a CDN (see main.ts) rather than
+  // served from disk, because Vercel's serverless build only bundles files
+  // that are actually require()'d/imported — express.static's runtime
+  // filesystem scan of node_modules/swagger-ui-dist is invisible to it, so
+  // those assets get pruned and 404 in production. helmet's default CSP
+  // only allows script-src 'self', which would otherwise block the CDN.
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        directives: {
+          ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+          'script-src': ["'self'", SWAGGER_UI_CDN_ORIGIN],
+        },
+      },
+    }),
+  );
   app.enableCors({ origin: config.get<string>('app.corsOrigin') });
 
   app.setGlobalPrefix('api');
