@@ -2,6 +2,7 @@ import { api } from './client';
 import type {
   DashboardSummary,
   Geofence,
+  Location,
   PaginatedResponse,
   Trip,
   Vehicle,
@@ -16,4 +17,8 @@ export const endpoints = {
       `/vehicles/${vehicleId}/trips?limit=${limit}`,
     ),
   listGeofences: () => api.get<Geofence[]>('/geofences'),
+  listRecentLocations: (vehicleId: string, limit = 150) =>
+    api.get<PaginatedResponse<Location>>(
+      `/vehicles/${vehicleId}/locations?limit=${limit}`,
+    ),
 };

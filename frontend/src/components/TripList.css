@@ -9,8 +9,15 @@
 .trip-row {
   display: flex;
   gap: 12px;
-  padding: 12px 0;
+  padding: 12px 10px;
+  margin: 0 -10px;
+  border-radius: 8px;
   border-bottom: 1px solid var(--color-border);
+  transition: background-color 0.15s ease;
+}
+
+.trip-row:hover {
+  background: var(--surface-2);
 }
 
 .trip-row:last-child {

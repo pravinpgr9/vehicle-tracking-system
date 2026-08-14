@@ -5,10 +5,12 @@ import { ApiError } from '../api/client';
 import { useVehicleSocket } from '../socket/useVehicleSocket';
 import { StatusPanel } from '../components/StatusPanel';
 import { TripList } from '../components/TripList';
-import { VehicleMap } from '../components/VehicleMap';
+import { VehicleMap, type TrailPoint } from '../components/VehicleMap';
 import { DistanceChart } from '../components/DistanceChart';
 import type { DashboardSummary, Geofence, Trip, Vehicle } from '../api/types';
 import './DashboardPage.css';
+
+const MAX_TRAIL_POINTS = 300;
 
 function errorMessage(error: unknown): string {
   return error instanceof ApiError ? error.message : 'Something went wrong';
@@ -20,6 +22,7 @@ export function DashboardPage() {
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [trips, setTrips] = useState<Trip[]>([]);
+  const [trail, setTrail] = useState<TrailPoint[]>([]);
   const [geofences, setGeofences] = useState<Geofence[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -52,17 +55,41 @@ export function DashboardPage() {
       return;
     }
     setIsLoading(true);
+    setTrail([]);
     Promise.all([
       endpoints.getDashboardSummary(selectedVehicleId),
       endpoints.listTrips(selectedVehicleId),
+      endpoints.listRecentLocations(selectedVehicleId),
     ])
-      .then(([summaryResult, tripsResult]) => {
+      .then(([summaryResult, tripsResult, locationHistory]) => {
         setSummary(summaryResult);
         setTrips(tripsResult.items);
+        // History comes back newest-first; the map trail is drawn oldest-first.
+        setTrail(
+          locationHistory.items
+            .slice()
+            .reverse()
+            .map((loc) => ({ latitude: loc.latitude, longitude: loc.longitude, speed: loc.speed })),
+        );
       })
       .catch((err: unknown) => setError(errorMessage(err)))
       .finally(() => setIsLoading(false));
   }, [selectedVehicleId, retryToken]);
+
+  // Live pings extend the trail already drawn from history, capped so the
+  // array (and the map's DOM) don't grow unbounded across a long trip.
+  useEffect(() => {
+    if (!liveLocation) {
+      return;
+    }
+    setTrail((prev) => {
+      const next = [
+        ...prev,
+        { latitude: liveLocation.latitude, longitude: liveLocation.longitude, speed: liveLocation.speed },
+      ];
+      return next.length > MAX_TRAIL_POINTS ? next.slice(next.length - MAX_TRAIL_POINTS) : next;
+    });
+  }, [liveLocation]);
 
   // A trip only lives in `liveTrip` (pinned via the socket) while it's still
   // ACTIVE. Once it completes, fold it into `trips` so it stays visible in
@@ -149,7 +176,9 @@ export function DashboardPage() {
               <VehicleMap
                 latitude={location.latitude}
                 longitude={location.longitude}
+                heading={location.heading}
                 label={selectedVehicle.name}
+                trail={trail}
               />
             ) : (
               <p className="dashboard-empty">No location data yet.</p>

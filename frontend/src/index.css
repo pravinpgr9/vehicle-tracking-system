@@ -99,12 +99,3 @@ select {
   box-shadow: var(--shadow);
 }
 
-.vehicle-marker span {
-  display: block;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: var(--color-primary);
-  border: 2px solid white;
-  box-shadow: 0 0 0 2px rgba(42, 120, 214, 0.4);
-}

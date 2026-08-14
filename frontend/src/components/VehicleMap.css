@@ -1,0 +1,182 @@
+.vehicle-map {
+  position: relative;
+  height: 100%;
+  width: 100%;
+}
+
+.vehicle-map .leaflet-container {
+  background: var(--surface-2);
+  font-family: inherit;
+}
+
+/* --- vehicle marker --- */
+
+.leaflet-div-icon.vehicle-marker-wrap {
+  background: transparent;
+  border: none;
+  position: relative;
+}
+
+.vehicle-marker-wrap::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 22px;
+  height: 22px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: var(--color-primary);
+  opacity: 0.4;
+  animation: vehicle-pulse 2.2s ease-out infinite;
+  pointer-events: none;
+}
+
+@keyframes vehicle-pulse {
+  0% {
+    transform: translate(-50%, -50%) scale(0.55);
+    opacity: 0.45;
+  }
+  70% {
+    transform: translate(-50%, -50%) scale(2);
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.vehicle-marker {
+  display: block;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  border: 2px solid var(--surface-1);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+}
+
+.vehicle-marker--heading {
+  position: relative;
+  width: 0;
+  height: 0;
+  background: none;
+  border: none;
+  box-shadow: none;
+}
+
+.vehicle-marker--heading::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+  transform: translate(-50%, -62%);
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-bottom: 15px solid var(--color-primary);
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.4));
+}
+
+/* --- speed trail --- */
+
+.vehicle-trail-halo {
+  stroke: var(--surface-1);
+  stroke-opacity: 0.8;
+}
+
+.vehicle-trail--good {
+  stroke: var(--color-good);
+  stroke-opacity: 0.95;
+}
+
+.vehicle-trail--warning {
+  stroke: var(--color-warning);
+  stroke-opacity: 0.95;
+}
+
+.vehicle-trail--critical {
+  stroke: var(--color-critical);
+  stroke-opacity: 0.95;
+}
+
+/* --- recenter button --- */
+
+.map-recenter-btn {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  z-index: 500;
+  padding: 8px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--surface-1);
+  color: var(--color-text);
+  font-size: 0.82rem;
+  font-weight: 600;
+  box-shadow: var(--shadow);
+  cursor: pointer;
+}
+
+.map-recenter-btn:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+/* --- legend --- */
+
+.map-legend {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  z-index: 500;
+  display: flex;
+  gap: 10px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface-1) 88%, transparent);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(4px);
+}
+
+.map-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.map-legend-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.map-legend-item--good .map-legend-dot {
+  background: var(--color-good);
+}
+
+.map-legend-item--warning .map-legend-dot {
+  background: var(--color-warning);
+}
+
+.map-legend-item--critical .map-legend-dot {
+  background: var(--color-critical);
+}
+
+.map-legend-hint {
+  display: none;
+  font-weight: 400;
+  opacity: 0.75;
+}
+
+@media (min-width: 900px) {
+  .map-legend-hint {
+    display: inline;
+  }
+}
