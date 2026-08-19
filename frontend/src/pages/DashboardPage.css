@@ -55,15 +55,20 @@
 
 .dashboard-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 20px;
 }
 
 .dashboard-status,
 .dashboard-trips,
 .dashboard-alerts,
-.dashboard-chart {
+.dashboard-chart,
+.dashboard-filters {
   padding: 22px;
+}
+
+.dashboard-filters {
+  grid-column: 1 / -1;
 }
 
 .dashboard-map {

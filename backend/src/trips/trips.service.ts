@@ -22,7 +22,15 @@ export class TripsService {
     await this.vehiclesService.findOneOwned(userId, vehicleId);
 
     const trips = await this.prisma.trip.findMany({
-      where: { vehicleId },
+      where: {
+        vehicleId,
+        ...((query.from || query.to) && {
+          startedAt: {
+            ...(query.from && { gte: new Date(query.from) }),
+            ...(query.to && { lte: new Date(query.to) }),
+          },
+        }),
+      },
       orderBy: [{ startedAt: 'desc' }, { id: 'desc' }],
       take: query.limit + 1,
       ...(query.cursor && { cursor: { id: query.cursor }, skip: 1 }),

@@ -61,6 +61,17 @@ The generated client's own files use `.js`-suffixed relative imports (correct fo
 
 Nothing in the current feature set needs a second stateful service: rate limiting and the trip/alert sweeps are in-process, and this is a single-instance deployment. Redis is a reasonable future addition (distributed rate limiting or caching across multiple backend instances) but isn't load-bearing for anything today, so it isn't running — see the commented-out block in `docker-compose.yml`.
 
+## Handling more concurrent requests, without adding infra
+
+A few config-level levers raise how much load the single instance can take, without the multi-instance restructuring Redis would require:
+
+- **DB connection pool**: `PrismaService` now passes `DATABASE_POOL_MAX` (default 20) into `PrismaPg`'s underlying `pg.Pool`, instead of relying on `pg`'s implicit default of 10. Raise this alongside your Postgres server's `max_connections` if you see pool timeouts under load.
+- **Split rate-limit buckets**: `POST /tracking/location` (GPS ingestion) previously shared the same 120/min global bucket as interactive dashboard API calls. It's device-authenticated and expected to arrive far more often, so it now gets its own bucket via `@Throttle` (`THROTTLE_INGESTION_LIMIT`, default 600/min) — see `tracking.controller.ts`, same pattern `auth.controller.ts` already used to tighten login/register. The app-wide default (`THROTTLE_LIMIT`) was also raised from 120 to 300/min.
+- **Response compression**: `compression()` middleware was added in `bootstrap.ts`. Every response here already sets `Cache-Control: no-store` (see above), so nothing is ever served from a client cache — compressing the payload directly cuts bandwidth and latency per request.
+- **Indexing**: `Trip` gained a `[vehicleId, startedAt]` index to support the day-wise trip filters (`TripQueryDto.from`/`to`) and the existing reports date-range queries, which previously only had `[vehicleId]`/`[vehicleId, status]` to lean on.
+
+Deliberately out of scope here: enabling Redis, running multiple backend replicas, or restructuring the in-process trip-detection/alert-sweep singletons — those all remain real options if a single instance with these tunings stops being enough (see the Redis section above).
+
 ## Frontend: one file owns the map provider
 
 `frontend/src/components/VehicleMap.tsx` is the only file that imports Leaflet. Every page/component that needs a map imports `VehicleMap` and passes it `{ latitude, longitude, label }` — nothing else knows or cares that it's Leaflet/OpenStreetMap underneath. Swapping to Google Maps later means rewriting this one file's internals to the same prop contract, not touching `DashboardPage.tsx` or anything else.

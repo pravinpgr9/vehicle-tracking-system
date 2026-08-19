@@ -12,6 +12,7 @@ export interface ReportConfig {
 
 export interface DatabaseConfig {
   url: string;
+  poolMax: number;
 }
 
 export interface JwtConfig {
@@ -59,6 +60,7 @@ export default (): Configuration => ({
   },
   database: {
     url: process.env.DATABASE_URL ?? '',
+    poolMax: Number(process.env.DATABASE_POOL_MAX ?? 20),
   },
   jwt: {
     secret: process.env.JWT_SECRET ?? '',
@@ -81,7 +83,7 @@ export default (): Configuration => ({
   },
   throttle: {
     ttlSeconds: Number(process.env.THROTTLE_TTL_SECONDS ?? 60),
-    limit: Number(process.env.THROTTLE_LIMIT ?? 120),
+    limit: Number(process.env.THROTTLE_LIMIT ?? 300),
   },
   report: {
     utcOffsetMinutes: Number(process.env.REPORT_UTC_OFFSET_MINUTES ?? 0),

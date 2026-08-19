@@ -11,6 +11,7 @@ export class PrismaService
   constructor(configService: ConfigService) {
     const adapter = new PrismaPg({
       connectionString: configService.get<string>('database.url'),
+      max: configService.get<number>('database.poolMax'),
     });
     super({ adapter });
   }

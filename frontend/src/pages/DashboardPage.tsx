@@ -7,10 +7,16 @@ import { StatusPanel } from '../components/StatusPanel';
 import { TripList } from '../components/TripList';
 import { VehicleMap, type TrailPoint } from '../components/VehicleMap';
 import { DistanceChart } from '../components/DistanceChart';
+import {
+  TripFilters,
+  DEFAULT_TRIP_FILTER,
+  type TripDateFilter,
+} from '../components/TripFilters';
 import type { DashboardSummary, Geofence, Trip, Vehicle } from '../api/types';
 import './DashboardPage.css';
 
 const MAX_TRAIL_POINTS = 300;
+const TRIPS_PAGE_LIMIT = 50;
 
 function errorMessage(error: unknown): string {
   return error instanceof ApiError ? error.message : 'Something went wrong';
@@ -25,8 +31,10 @@ export function DashboardPage() {
   const [trail, setTrail] = useState<TrailPoint[]>([]);
   const [geofences, setGeofences] = useState<Geofence[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [tripsLoading, setTripsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [retryToken, setRetryToken] = useState(0);
+  const [dateFilter, setDateFilter] = useState<TripDateFilter>(DEFAULT_TRIP_FILTER);
   const retry = useCallback(() => {
     setError(null);
     setRetryToken((token) => token + 1);
@@ -58,12 +66,10 @@ export function DashboardPage() {
     setTrail([]);
     Promise.all([
       endpoints.getDashboardSummary(selectedVehicleId),
-      endpoints.listTrips(selectedVehicleId),
       endpoints.listRecentLocations(selectedVehicleId),
     ])
-      .then(([summaryResult, tripsResult, locationHistory]) => {
+      .then(([summaryResult, locationHistory]) => {
         setSummary(summaryResult);
-        setTrips(tripsResult.items);
         // History comes back newest-first; the map trail is drawn oldest-first.
         setTrail(
           locationHistory.items
@@ -75,6 +81,26 @@ export function DashboardPage() {
       .catch((err: unknown) => setError(errorMessage(err)))
       .finally(() => setIsLoading(false));
   }, [selectedVehicleId, retryToken]);
+
+  // Kept separate from the effect above so switching the date filter only
+  // re-fetches trips (with a small "Loading…" swap in those two cards)
+  // instead of blanking the whole dashboard, including the filter bar
+  // itself, while it refetches.
+  useEffect(() => {
+    if (!selectedVehicleId) {
+      return;
+    }
+    setTripsLoading(true);
+    endpoints
+      .listTrips(selectedVehicleId, {
+        limit: TRIPS_PAGE_LIMIT,
+        from: dateFilter.from,
+        to: dateFilter.to,
+      })
+      .then((tripsResult) => setTrips(tripsResult.items))
+      .catch((err: unknown) => setError(errorMessage(err)))
+      .finally(() => setTripsLoading(false));
+  }, [selectedVehicleId, retryToken, dateFilter]);
 
   // Live pings extend the trail already drawn from history, capped so the
   // array (and the map's DOM) don't grow unbounded across a long trip.
@@ -159,6 +185,10 @@ export function DashboardPage() {
 
       {!error && !isLoading && selectedVehicle && summary && (
         <div className="dashboard-grid">
+          <div className="card dashboard-filters">
+            <TripFilters value={dateFilter} onChange={setDateFilter} />
+          </div>
+
           <div className="card dashboard-status">
             <StatusPanel
               vehicle={selectedVehicle}
@@ -186,13 +216,21 @@ export function DashboardPage() {
           </div>
 
           <div className="card dashboard-chart">
-            <h3>Distance, last 7 days</h3>
-            <DistanceChart trips={trips} />
+            <h3>Distance — {dateFilter.label}</h3>
+            {tripsLoading ? (
+              <p className="dashboard-loading">Loading…</p>
+            ) : (
+              <DistanceChart trips={trips} from={dateFilter.from} to={dateFilter.to} />
+            )}
           </div>
 
           <div className="card dashboard-trips">
-            <h3>Recent trips</h3>
-            <TripList trips={displayedTrips} geofences={geofences} />
+            <h3>Trips — {dateFilter.label}</h3>
+            {tripsLoading ? (
+              <p className="dashboard-loading">Loading…</p>
+            ) : (
+              <TripList trips={displayedTrips} geofences={geofences} />
+            )}
           </div>
 
           {recentAlerts.length > 0 && (

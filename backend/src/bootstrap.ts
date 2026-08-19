@@ -1,3 +1,4 @@
+import compression from 'compression';
 import helmet from 'helmet';
 import {
   INestApplication,
@@ -17,6 +18,11 @@ import { SWAGGER_UI_CDN_ORIGIN } from './swagger.constants';
  */
 export function configureApp(app: INestApplication): void {
   const config = app.get(ConfigService);
+
+  // Every response is re-sent in full (see the no-store Cache-Control
+  // below), so compressing the payload directly cuts per-request latency
+  // and bandwidth under load — a cheap, safe throughput win.
+  app.use(compression());
 
   // Every response here is dynamic and often per-user — a conditional
   // GET revalidating to a bare 304 has broken naive fetch() clients that

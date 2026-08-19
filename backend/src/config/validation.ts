@@ -7,6 +7,7 @@ export const validationSchema = Joi.object({
   PORT: Joi.number().default(3000),
 
   DATABASE_URL: Joi.string().uri().required(),
+  DATABASE_POOL_MAX: Joi.number().positive().default(20),
 
   JWT_SECRET: Joi.string().min(16).required(),
   JWT_EXPIRES_IN: Joi.string()
@@ -26,5 +27,6 @@ export const validationSchema = Joi.object({
   GPS_MAX_JUMP_SECONDS: Joi.number().positive().default(10),
 
   THROTTLE_TTL_SECONDS: Joi.number().positive().default(60),
-  THROTTLE_LIMIT: Joi.number().positive().default(120),
+  THROTTLE_LIMIT: Joi.number().positive().default(300),
+  THROTTLE_INGESTION_LIMIT: Joi.number().positive().default(600),
 });

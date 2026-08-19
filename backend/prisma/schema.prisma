@@ -158,6 +158,7 @@ model Trip {
 
   @@index([vehicleId])
   @@index([vehicleId, status])
+  @@index([vehicleId, startedAt])
   @@map("trips")
   // A partial unique index — one row per vehicle where status = 'ACTIVE' —
   // is added directly via migration.sql (see

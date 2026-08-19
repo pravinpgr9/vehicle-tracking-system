@@ -1,6 +1,13 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import {
+  IsISO8601,
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  Min,
+} from 'class-validator';
 
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 100;
@@ -20,4 +27,18 @@ export class TripQueryDto {
   @IsOptional()
   @IsString()
   cursor?: string;
+
+  @ApiPropertyOptional({
+    description: 'ISO 8601 timestamp, inclusive — only trips started at or after this',
+  })
+  @IsOptional()
+  @IsISO8601()
+  from?: string;
+
+  @ApiPropertyOptional({
+    description: 'ISO 8601 timestamp, inclusive — only trips started at or before this',
+  })
+  @IsOptional()
+  @IsISO8601()
+  to?: string;
 }

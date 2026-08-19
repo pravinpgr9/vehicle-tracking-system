@@ -3,7 +3,11 @@ import type { Trip } from '../api/types';
 import './DistanceChart.css';
 
 const METERS_PER_KM = 1000;
-const DAYS_TO_SHOW = 7;
+const DEFAULT_DAYS_TO_SHOW = 7;
+// A custom range can span an arbitrary number of days; cap how many bars we
+// render so the chart stays legible (it scrolls horizontally beyond a
+// screen's worth of bars rather than squeezing them illegibly thin).
+const MAX_BUCKETS = 62;
 const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000;
 
 interface DayBucket {
@@ -16,14 +20,25 @@ function startOfDay(date: Date): number {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
 }
 
-function buildBuckets(trips: Trip[]): DayBucket[] {
-  const today = startOfDay(new Date());
-  const buckets: DayBucket[] = Array.from({ length: DAYS_TO_SHOW }, (_, i) => {
-    const dayStart = today - (DAYS_TO_SHOW - 1 - i) * MILLISECONDS_PER_DAY;
+function buildBuckets(trips: Trip[], from?: string, to?: string): DayBucket[] {
+  const end = to ? startOfDay(new Date(to)) : startOfDay(new Date());
+  const defaultStart = end - (DEFAULT_DAYS_TO_SHOW - 1) * MILLISECONDS_PER_DAY;
+  const requestedStart = from ? startOfDay(new Date(from)) : defaultStart;
+  const requestedDays =
+    Math.round((end - requestedStart) / MILLISECONDS_PER_DAY) + 1;
+  const days = Math.min(Math.max(requestedDays, 1), MAX_BUCKETS);
+  // If the range is wider than MAX_BUCKETS, keep the most recent `days`
+  // days of it rather than the oldest.
+  const start = end - (days - 1) * MILLISECONDS_PER_DAY;
+  const labelFormat: Intl.DateTimeFormatOptions =
+    days > 10 ? { day: 'numeric', month: 'short' } : { weekday: 'short' };
+
+  const buckets: DayBucket[] = Array.from({ length: days }, (_, i) => {
+    const dayStart = start + i * MILLISECONDS_PER_DAY;
     const date = new Date(dayStart);
     return {
       key: date.toDateString(),
-      label: date.toLocaleDateString(undefined, { weekday: 'short' }),
+      label: date.toLocaleDateString(undefined, labelFormat),
       km: 0,
     };
   });
@@ -41,10 +56,12 @@ function buildBuckets(trips: Trip[]): DayBucket[] {
 
 interface DistanceChartProps {
   trips: Trip[];
+  from?: string;
+  to?: string;
 }
 
-export function DistanceChart({ trips }: DistanceChartProps) {
-  const buckets = useMemo(() => buildBuckets(trips), [trips]);
+export function DistanceChart({ trips, from, to }: DistanceChartProps) {
+  const buckets = useMemo(() => buildBuckets(trips, from, to), [trips, from, to]);
   const [hovered, setHovered] = useState<string | null>(null);
   const maxKm = Math.max(1, ...buckets.map((b) => b.km));
 
